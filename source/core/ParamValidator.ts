@@ -21,6 +21,48 @@ abstract class ParamValidator {
 
 }
 
+class PatternValidator extends ParamValidator {
+
+    private Pattern: string ;
+
+    constructor( pattern: string ) {
+        this.Pattern = pattern ;
+    }
+
+    validate( params: Map<string, StrNum>, param: string, ...args: StrNum[] ) {
+        const value = params.get( param ) ;
+        const regex = new RegExp( this.Pattern ) ;
+        if ( !regex.test( value ) ) {
+            throw `Parameter '${param}' with value '${value}' does NOT match patter ${this.Pattern}.` ;
+        }
+    }
+
+}
+
+class EmailValidator extends PatternValidator {
+
+    constructor() {
+        super( "[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,4}" ) ;
+    }
+
+}
+
+class NumericValidator extends PatternValidator {
+
+    constructor() {
+        super( "[0-9]+" ) ;
+    }
+
+}
+
+class AlphaNumericValidator extends PatternValidator {
+
+    constructor() {
+        super( "[a-z0-9]+" ) ;
+    }
+
+}
+
 class RequiredValidator extends ParamValidator {
 
     validate( params: Map<string, StrNum>, param: string, ...args: StrNum[] ) {
