@@ -1,11 +1,6 @@
 
 
 /**
- * A type for data types used in JSON
- */
-type StrNum = string | number ;
-
-/**
  * Abstract class to validate parameters.
  * Contains a single <code>validate</code> method.
  */

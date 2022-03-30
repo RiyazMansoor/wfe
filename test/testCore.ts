@@ -3,7 +3,7 @@ import StrNum from "./../../core/ParamValidator" ;
 
 type TestExecutor = ( inputs: StrNum[] ) => any ;
 type TestVerifier = ( result: any ) => boolean ;
-type TestFailures = { inputs: StrNum[][], expected: any, actual: any }
+type TestFailures = { inputs: StrNum[], expected: any, actual: any }
 
 // TODO
 function execute( inputs: StrNum[][], exceptions: boolean[], fnExe: TestExecutor, fnVer: TestVerifier ) : TestFailures[] {
