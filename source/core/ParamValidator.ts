@@ -33,7 +33,7 @@ class PatternValidator extends ParamValidator {
         const value = params.get( param ) ;
         const regex = new RegExp( this.Pattern ) ;
         if ( !regex.test( value ) ) {
-            throw `Parameter '${param}' with value '${value}' does NOT match patter ${this.Pattern}.` ;
+            throw `Parameter '${param}' with value '${value}' does NOT match pattern ${this.Pattern}.` ;
         }
     }
 
@@ -58,7 +58,7 @@ class NumericValidator extends PatternValidator {
 class AlphaNumericValidator extends PatternValidator {
 
     constructor() {
-        super( "[a-z0-9]+" ) ;
+        super( "[A-Za-z0-9]+" ) ;
     }
 
 }
@@ -78,7 +78,7 @@ class RequiredValidator extends ParamValidator {
  * Validates string length if it exists.
  * For existance call the RequiredValidator
  */
-class StringValidator extends ParamValidator {
+class StringLengthValidator extends ParamValidator {
 
     /**
      * call method eg: validate( params: Map<string, any>, param: string, minlen: number, maxlen: number ) 
@@ -99,7 +99,7 @@ class StringValidator extends ParamValidator {
     
 }
 
-class DateValidator extends ParamValidator {
+class DateRangeValidator extends ParamValidator {
 
     /**
      * call method eg: validate( params: Map<string, StrNum>, param: string, before: number, after: number )
@@ -108,7 +108,7 @@ class DateValidator extends ParamValidator {
      */
     validate( params: Map<string, StrNum>, param: string, ...args: StrNum[] ) {
         if ( args.length === 0 ) {
-            throw `DateValidator :: missing rest arguments.` ;
+            throw `DateRangeValidator :: missing rest arguments.` ;
         }
         const today = (new Date()).setHours( 0, 0, 0, 0 ) ;
         const date : number = params.get( param ) ;
@@ -126,44 +126,70 @@ class DateValidator extends ParamValidator {
     
 }
 
-class PhoneValidator extends ParamValidator {
+class TimeRangeValidator extends ParamValidator {
 
-    static Pattern : string = "[0-9]{7}" ;
-
+    /**
+     * call method eg: validate( params: Map<string, StrNum>, param: string, before: number, after: number )
+     * @param before validate date is before (today+before) 
+     * @param after validate date is after (today+after)
+     */
     validate( params: Map<string, StrNum>, param: string, ...args: StrNum[] ) {
-        const phone: string = params.get( param ) ;
-        const regex: RegExp = new RegExp( Pattern ) ;
-        if ( phone && !regex.test( phone ) ) {
-            throw `Phone parameter '${param}' with value '${phone}' pattern match (0000000) - FAILED.` ;
+        if ( args.length === 0 ) {
+            throw `TimeRangeValidator :: missing rest arguments.` ;
+        }
+        const time : number = params.get( param ) % ( 1000*3600*24 ) ;
+        let before: number, after: number ;
+        const hoursBefore: number = ( args && args.length > 0 ? args[0] : undefined ) ;
+        if ( hoursBefore ) {
+            const minutesBefore: number = ( args && args.length > 1 ? args[1] : 0 ) ;
+            before = 1000*60*minutesBefore + 1000*60*60*hoursBefore ;
+        }
+        const hoursAfter: number = ( args && args.length > 2 ? args[2] : undefined ) ;
+        if ( hoursAfter ) {
+            const minutesAfter: number = ( args && args.length > 0 ? args[0] : 0 ) ;
+            after = 1000*60*minutesAfter + 1000*60*60*hoursAfter ;
+        }
+        if ( time && before != undefined && time > before ) {
+            throw `Time parameter '${param}' with value '${new Date( time ) }' NOT before (${new Date( before )}) - FAILED.` ;
+        }
+        if ( time && after && time < after  ) {
+            throw `Date parameter '${param}' with value '${new Date( time ) }' NOT after (${new Date( after )}) - FAILED.` ;
         }
     }
     
 }
 
-class NicValidator extends ParamValidator {
+class NumberRangeValidator extends ParamValidator {
 
-    static Pattern : string = "A[0-9]{6}" ;
-
+    /**
+     * call method eg: validate( params: Map<string, StrNum>, param: string, min: number, max: number )
+     * @param min validate date is before (today+before) 
+     * @param max validate date is after (today+after)
+     */
     validate( params: Map<string, StrNum>, param: string, ...args: StrNum[] ) {
-        const nic: string = params.get( param ) ;
-        const regex: RegExp = new RegExp( Pattern ) ;
-        if ( nic && !regex.test( nic ) ) {
-            throw `NIC parameter '${param}' with value '${nic}' pattern match (A000000) - FAILED.` ;
+        if ( args.length === 0 ) {
+            throw `NumberRangeValidator :: missing rest arguments.` ;
+        }
+        const num : number = params.get( param ) ;
+        const min: number = ( args && args.length > 0 ? args[0] : undefined ) ;
+        const max: number = ( args && args.length > 1 ? args[1] : undefined ) ;
+        if ( num && min != undefined && num < min ) {
+            throw `Number parameter '${param}' with value '${num}' NOT >= ${min} - FAILED.` ;
+        }
+        if ( num && max != undefined && num > max ) {
+            throw `Number parameter '${param}' with value '${num}' NOT <= ${max} - FAILED.` ;
         }
     }
     
 }
 
-class PassportValidator extends ParamValidator {
+// types
+export { StrNum } ;
+// abstract classes
+export { ParamValidator } ;
+//  classes that validate string patterns
+export { PatternValidator, EmailValidator, NumericValidator, AlphaNumericValidator } ;
+// classes that do general validation
+export { RequiredValidator, StringLengthValidator, NumberRangeValidator, DateRangeValidator, Time } ;
 
-    static Pattern : string = "[0-9A-Z]{9}" ;
 
-    validate( params: Map<string, StrNum>, param: string, ...args: StrNum[] ) {
-        const passport: string = params.get( param ) ;
-        const regex: RegExp = new RegExp( Pattern ) ;
-        if ( passport && !regex.test( passport ) ) {
-            throw `NIC parameter '${param}' with value '${passport}' pattern match (9 AlphaNum) - FAILED.` ;
-        }
-    }
-    
-}
