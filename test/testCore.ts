@@ -1,29 +1,40 @@
 
-import StrNum from "./../../core/ParamValidator" ;
+import { TestResult, TestRunner } from "./../Types" ;
 
-type TestExecutor = ( inputs: StrNum[] ) => any ;
-type TestVerifier = ( result: any ) => boolean ;
-type TestFailures = { inputs: StrNum[], expected: any, actual: any }
 
-// TODO
-function execute( inputs: StrNum[][], exceptions: boolean[], fnExe: TestExecutor, fnVer: TestVerifier ) : TestFailures[] {
-    let failures: TestFailures[] = [] ;
-    for ( let i = 0 ; i < inputs.length ; i++ ) {
-        const failure = { "inputs":inputs[i], "expected":results[i] } ;
+
+function testExecute( exceptions: boolean[], fnRunner: TestRunner ) : number[] {
+    const failures: number[] = [] ;
+    for ( let testIndex = 0 ; testIndex < exceptions.length ; testIndex++ ) {
         try {
-            const result = fnExecuter.execute( inputs[i] ) ;
-            if ( !fnResult.verify( result, results[i] ) ) {
-                failure[ "actual" ] = result ;
-                failures.push( failure ) ;
+            const isCorrect = fnRunner( testIndex ) ;
+            // if exception is expected or incorrect result
+            if ( exceptions[testIndex] || !isCorrect ) {
+                failures.push( testIndex ) ;
             }
         } catch ( e ) {
+            // if no expection is expected.
             if ( !exceptions[i] ) {
-                failure[ "actual" ] = e ;
-                failures.push( failure ) ;
+                failures.push( testIndex ) ;
             }
         }
     }
     return failures ;
 }
 
+function testModule( moduleName: string, ...funcs: function[] ) : TestResult {
+    const result: TestResult = { failed: 0, total: 0 } ;
+    console.info( `Testing module "${moduleName}".` ) ;
+    for ( let fi = 0 ; fi < functions.length; fi++ ) {
+        const fiResult: TestResult = funcs[fi]() ;
+        result.failed += fiResult.failed ;
+        result.total += fiResult.total ;
+    }
+    if ( result.failed == 0 ) {
+        console.info( `  Module "${moduleName}" - all ${result.total} tests completed successfully.`)
+    } else {
+        console.error( `  Module "${moduleName}" -  ${result.failed}/${result.total} tests FAILED.`)
+    }
+    return result ;
+}
 
