@@ -1,7 +1,8 @@
 
-import StrNum from "./../../core/Types" ;
 import randomId from "./../../core/Util" ;
-import testExecute from "./../testCore" ;
+
+import { TestResult, TestRunner, TestMethods } from "./../Types" ;
+import { testExecute, testModule } from "./../testCore" ;
 
 function testRandomId() {
     const lens: number[] = [ 1, 7, 13, 19, 23, 29, 67 ] ;
@@ -9,11 +10,12 @@ function testRandomId() {
         const randomStr: string = randomId( lens[testIndex] ) ;
         return ( randomStr.length == lens[testIndex] ) ;
     }
-    const failures: number[] = testExecute( [], tester) ;
-    for ( let fi = 0 ; fi < failures.length ; fi++ ) {
-        const testIndex = failures[fi] ;
-        console.error( `testRandomId FAILED :: passed( ${lens[testIndex]} ) ` ) ;
-    }
+    const exception: boolean[] = lens.map( l => false ) ;
+    return testExecute( "core.Util.randomId", exceptions, tester ) ;
 }
-test_workflowId() ;
+
+function testUtilMethods() : TestMethods {
+    const funcs = [ testRandomId ] ;
+    return { moduleName: "core.Util", funcs: funcs } ;
+}
 
