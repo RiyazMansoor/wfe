@@ -14,8 +14,8 @@ function testRandomId() {
     return testExecute( "core.Util.randomId", exceptions, tester ) ;
 }
 
-function testUtilMethods() : TestMethods {
+function testUtil() : TestMethods {
     const funcs = [ testRandomId ] ;
-    return { moduleName: "core.Util", funcs: funcs } ;
+    return { moduleName: "/core/Util", funcs: funcs } ;
 }
 

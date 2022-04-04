@@ -1,6 +1,5 @@
 
-import { TestResult, TestRunner } from "./../Types" ;
-
+import { TestResult, TestRunner, TestFunctions } from "./../Types" ;
 
 
 function testExecute( methodName: string, exceptions: boolean[], fnRunner: TestRunner ) : TestResult {
@@ -27,32 +26,32 @@ function testExecute( methodName: string, exceptions: boolean[], fnRunner: TestR
     return { failed: failures.length, total: exceptions.length } ;
 }
 
-function testModule( moduleName: string, ...funcs: function[] ) : TestResult {
+function testModuleTree( module: TestFunctions ) : TestResult {
     const result: TestResult = { failed: 0, total: 0 } ;
-    for ( let fi = 0 ; fi < functions.length; fi++ ) {
-        const fiResult: TestResult = funcs[fi]() ;
-        result.failed += fiResult.failed ;
-        result.total += fiResult.total ;
-    }
-    if ( result.failed == 0 ) {
-        console.info( `  Module "${moduleName}" :: all ${result.total} tests completed successfully.` ) ;
-    } else {
-        console.error( `  Module "${moduleName}" :: ${result.failed}/${result.total} tests FAILED.` ) ;
+    for ( let ti = 0 ; ti < module.funcs.length ; ti++ ) {
+        const result1: TestFunctions|TestResult = module.funcs[ti]() ;
+        if ( result1 instanceof TestResult ) {
+            result.failed += result1.failed ;
+            result.total += result1.total ;
+        } else {
+            const result2 = testModuleTree( result1 ) ;
+            result.failed += result2.failed ;
+            result.total += result2.total ;
+            if ( result2.failed == 0 ) {
+                console.info( `Module "${result1.moduleName}" :: all ${result2.total} tests completed successfully.` ) ;
+            } else {
+                console.error( `Module "${result1.moduleName}" :: ${result2.failed}/${result2.total} tests FAILED.` ) ;
+            }
+        }
     }
     return result ;
 }
 
-function testModules( appName: string,  ...funcs: function[] ) : void {
-    const result: TestResult = { failed: 0, total: 0 } ;
-    for ( let fi = 0 ; fi < functions.length; fi++ ) {
-        const fiResult: TestResult = funcs[fi]() ;
-        result.failed += fiResult.failed ;
-        result.total += fiResult.total ;
-    }
-    if ( result.failed == 0 ) {
-        console.info( `App "${appName}" :: all ${result.total} tests completed successfully.` ) ;
-    } else {
-        console.error( `App "${appName}" :: ${result.failed}/${result.total} tests FAILED.` ) ;
-    }
+function testRootModules( funcs: functions[] ) : TestResult {
+    const root: TestFunctions = { moduleName: "/", funcs: funcs } ;
+    return testModuleTree( root ) ;
 }
 
+export { 
+    testExecute, testRootModules 
+}

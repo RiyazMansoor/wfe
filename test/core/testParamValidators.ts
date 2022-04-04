@@ -5,3 +5,9 @@ function testPatternValidator() {
     const successes: boolean[] = [] ;
 
 }
+
+
+function testParamValidators() : TestMethods {
+    const funcs = [  ] ;
+    return { moduleName: "/core/ParamValidators", funcs: funcs } ;
+}
