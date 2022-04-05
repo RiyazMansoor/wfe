@@ -1,5 +1,46 @@
 
 
+function validatePattern( params: Map<string, StrNum>, param: string, pattern: string ) {
+    if ( args.length === 0 ) {
+        throw `Arugment regex "pattern" required.` ;
+    }
+    const value = params.get( param ) ;
+    const regex = new RegExp( pattern ) ;
+    if ( !regex.test( value ) ) {
+        throw `Parameter '${param}' with value '${value}' does NOT match pattern ${pattern}.` ;
+    }
+}
+function validateEmail( params: Map<string, StrNum>, param: string ) {
+    validatePattern( params, param, "[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,4}" ) ;
+}
+function validateNumeric( params: Map<string, StrNum>, param: string ) {
+    validatePattern( params, param, "[0-9]+" ) ;
+}
+function validateAlphaNumeric( params: Map<string, StrNum>, param: string ) {
+    validatePattern( params, param, "[A-Za-z0-9]+" ) ;
+}
+
+function validateRequired( params: Map<string, StrNum>, param: string ) {
+    const value = params.get( param ) ;
+    if ( !value ) {
+        throw `Parameter '${param}' with value '${value}' is required.` ;
+    }
+}
+
+function validateStringLength( params: Map<string, StrNum>, param: string, minlen: number, maxlen: number ) {
+    const str = params.get( param ) ;
+    const minlen: number = ( args && args.length > 0 ? args[0] : undefined ) ;
+    const maxlen: number = ( args && args.length > 1 ? args[1] : undefined ) ;
+    if ( str && minlen && str.length < minlen ) {
+        throw `String parameter '${param}' with value '${str}' minimum length ${minlen} - FAILED.` ;
+    }
+    if ( str && maxlen && str.length > maxlen ) {
+        throw `String parameter '${param}' with value '${str}' maximum length ${maxlen} - FAILED.` ;
+    }
+}
+
+
+
 /**
  * Abstract class to validate parameters.
  * Contains a single <code>validate</code> method.
