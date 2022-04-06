@@ -1,37 +1,34 @@
 
 
-import { StrNum, DataMap, DataValidationMap } from "./../Types" ;
+import { StrNum, DataMap, DataValidationMap, DataValidator, DataValidatorMap } from "./../Types" ;
 
 function validate( dataMap: DataMap, validations: DataValidationMap, validators: Map<string, function> = new Map() ) {
+    const result: Map<string, string[]> = new Map() ;
     const cValidators : Map<string, function> = coreValidators() ;
     const paramKeys: string[] = validations.keys() ;
     for ( let pi = 0 ; pi < paramKeys.length ; pi++ ) {
         const param: string = paramKeys[pi] ;
         const paramValidations = validations.get( param ) ;
+        const errors: string[] = [] ;
         for ( let vi = 0 ; vi < paramValidations.length ; vi++ ) {
             const validation: string = paramValidations[vi][0].toLowerCase() ;
             const arg1: StrNum = paramValidations[vi][1] ;
             const arg2: StrNum = paramValidations[vi][2] ;
             const validator = validators.get( validation ) || cValidators.get( validation ) ;
             if ( !validator ) {
-
+                errors.push( `No validator specified for param ${param}` ) ;
                 continue ;
             }
-            validator.call( null, dataMap, param, arg1, arg2 ) ;
-            switch ( validation ) {
-                case "pattern":
-                    const pattern: string = paramValidations[vi][0] ;
-
-                    break ;
-                default:
-
-            }
+            const validationErrors: string[] = validator.call( null, dataMap, param, arg1, arg2 ) ;
+            errors.push( ...validationErrors ) ;
         }
+        if ( errors.length > 0 ) result.set( param, errors ) ;
     }
+    return result ;
 }
 
-function coreValidators() : Map<string, function> {
-    const validators: Map<string, function> = new Map() ;
+function coreValidators() : DataValidatorMap {
+    const validators: DataValidationMap = new Map() ;
     validators.set( "pattern", validatePattern ) ;
     validators.set( "email", validateEmail ) ;
     validators.set( "numeric", validateNumeric ) ;
@@ -43,15 +40,14 @@ function coreValidators() : Map<string, function> {
     return validators ;
 }
 
-function validatePattern( dataMap: DataMap, param: string, pattern: string ) {
-    if ( args.length === 0 ) {
-        throw `Argument for regex string "pattern" required.` ;
-    }
+function validatePattern( dataMap: DataMap, param: string, pattern: string ) : string[] {
+    const validationErrors : string[] = [] ;
     const value = dataMap.get( param ) ;
     const regex = new RegExp( pattern ) ;
     if ( !regex.test( value ) ) {
-        throw `Parameter '${param}' with value '${value}' does NOT match pattern ${pattern}.` ;
+        validationErrors.push( `Parameter '${param}' with value '${value}' does NOT match pattern ${pattern}.` ) ;
     }
+    return validationErrors ;
 }
 function validateEmail( dataMap: DataMap, param: string ) {
     validatePattern( dataMap, param, "[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,4}" ) ;
