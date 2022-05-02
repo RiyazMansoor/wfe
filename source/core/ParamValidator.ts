@@ -2,7 +2,7 @@
 
 import { StrNum, DataMap, DataValidationMap, DataValidator, DataValidatorMap } from "./../Types" ;
 
-function validate( dataMap: DataMap, validations: DataValidationMap, validators: Map<string, function> = new Map() ) {
+function validate( dataMap: DataMap, validations: DataValidationMap, validators: DataValidatorMap = new Map() ) {
     const result: Map<string, string[]> = new Map() ;
     const cValidators : Map<string, function> = coreValidators() ;
     const paramKeys: string[] = validations.keys() ;
@@ -28,7 +28,7 @@ function validate( dataMap: DataMap, validations: DataValidationMap, validators:
 }
 
 function coreValidators() : DataValidatorMap {
-    const validators: DataValidationMap = new Map() ;
+    const validators: DataValidatorMap = new Map() ;
     validators.set( "pattern", validatePattern ) ;
     validators.set( "email", validateEmail ) ;
     validators.set( "numeric", validateNumeric ) ;
