@@ -1,22 +1,13 @@
 
 
-type NID = string ;
 type Email = string ;
+
+type DUsername = string ;
 type DInstanceId = string ;
 
 type DType = string | number ;
 
 type DBlock = Map<string, DType|DBlock> ;
-
-type Workflow = {
-    wfType: string,
-    wfInstanceId: DInstanceId,
-    wfCreatedAt: number,
-    wfCreatedBy: string,
-    wfClosedAt: number,
-    wfClosedBy: string,
-    wfNodes: DInstanceId[]
-}
 
 type ParentWorkFlow = {
     pwfType: string,
@@ -27,20 +18,65 @@ type ParentWorkFlow = {
     pwfNodeToInstanceId: DInstanceId,
 }
 
-abstract class Workflow {
+type Workflow = {
+    wfType: string,
+    wfInstanceId: DInstanceId,
+    wfStartedAt: number,
+    wfEndedAt: number,
+    wfParent: ParentWorkFlow,
+    wfNodes: DInstanceId[]
+}
+
+class BaseWorkflow {
 
     protected wfType: string = null ;
     protected wfInstanceId: string = null ;
 
-    protected wfStarted: number = Date.now() ;
-    protected wfEnded: number = Date.now() ;
+    protected wfStartedAt: number = Date.now() ;
+    protected wfEndedAt: number = 0 ;
     
-    Workflow( type: string ) {
-        this.wfType = type ;
+    protected wfParent: ParentWorkFlow = null ;
+    protected wfNodes: DInstanceId[] = [] ;
+
+    constructor() {
+        // default empty constructor
     }
 
     protected End() : void {
         this.wfEnded = Date.now() ;
     }
+
+    toJSON() : object {
+        return {
+            wfType: this.wfType,
+            wfInstanceId: this.wfInstanceId,
+            wfStartedAt: this.wfStartedAt,
+            wfEndedAt: this.wfEndedAt,
+            wfParent: this.wfParent,
+            wfNodes: this.wfNodes
+        }
+
+    }
+
+    toString() : string {
+        return JSON.stringify( toJSON() ) ;
+    }
+
+    toObject( wf: Workflow ) : void {
+        this.wfType = wf.wfType ;
+        this.wfInstanceId = wf.wfInstanceId ;
+        this.wfStartedAt = wf.wfStartedAt ;
+        this.wfEndedAt = wf.wfEndedAt ;
+        this.wfParent = wf.wfParent ;
+        this.wfNodes = wf.wfNodes ;
+    }
+
+}
+
+function wfSerialize( wfObject: object ) {
+
+}
+
+function wfDeserialize( wfType: string, wfInstanceId: DInstanceId ) : AbstractWorkflow {
 
 }
