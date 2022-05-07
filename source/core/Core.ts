@@ -46,6 +46,8 @@ class BaseWorkflow {
         this.wfEnded = Date.now() ;
     }
 
+
+
     toJSON() : object {
         return {
             wfType: this.wfType,
@@ -78,5 +80,38 @@ function wfSerialize( wfObject: object ) {
 }
 
 function wfDeserialize( wfType: string, wfInstanceId: DInstanceId ) : AbstractWorkflow {
+
+}
+
+enum NodeType { INPUT, CHOOSE, AND }
+
+abstract class AbstractNode {
+
+    protected ndName: string ;
+    protected ndInstanceId: string ;
+
+    protected ndStartedAt: number = Date.now() ;
+    protected ndEndedAt: number = 0 ;
+
+    protected ndType: NodeType ;
+
+    constructor() {
+        // default constructor
+    }
+
+    public Ended() : void {
+        this.ndEndedAt = Date.now() ;
+    }
+
+    public Display() : string {
+        return undefined ;
+    }
+
+    
+
+}
+
+class InputNode extends AbstractNode {
+
 
 }
