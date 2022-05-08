@@ -153,7 +153,8 @@ abstract class Node {
 
 }
 
-type PredicatePath = [ ( DBlock ) => boolean, WfType, NdType ] ; // string node-type
+type Predicate = ( DBlock ) => boolean ;
+type PredicatePath = [ Predicate, WfType, NdType ] ; // string node-type
 
 abstract class IfNode extends Node {
 
@@ -164,15 +165,40 @@ abstract class IfNode extends Node {
     }
 
     protected CreateNext( wfData: DBlock ) : boolean {
+        let result: boolean = false ;
         for ( const pp of routes ) {
             if ( pp( wfData ) ) {
                 // create node ; 
                 // create new workflow ;
-                return true ;
+                result = true ;
+                break ;
             }
         }
-        return false ;
+        return result ;
     }
+
+}
+
+abstract class BranchOutNode extends Node {
+
+    protected routes: PredicatePath[] = [] ;
+
+    constructor() {
+        super() ;
+    }
+
+    protected CreateNext( wfData: DBlock ) : boolean {
+        let result: boolean = false ;
+        for ( const pp of routes ) {
+            if ( pp( wfData ) ) {
+                // create node ; 
+                // create new workflow ;
+                result = true ;
+            }
+        }
+        return result ;
+    }
+
 }
 
 
