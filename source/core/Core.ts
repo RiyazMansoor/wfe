@@ -1,90 +1,29 @@
 
+import { NewInstanceId } from "./Utils" ;
+
+enum NodeStatus { CREATED, READY, STARTED, ENDED }
 
 type Email = string ;
 type WfType = string ;
 type NdType = string ;
+type NdJoinKey = string ;
 type DUsername = string ;
 type DInstanceId = string ;
 
 type DType = string | number ;
 type DBlock = Map<string, DType|DBlock> ;
 
-type ParentWorkFlow = {
-    pwfType: WfType,
-    pwfInstanceId: DInstanceId,
-    pwfNodeFromType: NdType,
-    pwfNodeFromInstanceId: DInstanceId,
-    pwfNodeToType: NdType,
-    pwfNodeToInstanceId: DInstanceId,
-}
-
-type Workflow = {
+type NodeType = {
+    ndType: NdType,
+    ndInstanceId: DInstanceId,
     wfType: WfType,
     wfInstanceId: DInstanceId,
-    wfStartedAt: number,
-    wfEndedAt: number,
-    wfParent: ParentWorkFlow,
-    wfNodes: DInstanceId[]
-}
-
-enum NodeStatus { CREATED, READY, STARTED, ENDED }
-
-class BaseWorkflow {
-
-    protected wfType: string = null ;
-    protected wfInstanceId: string = null ;
-
-    protected wfStartedAt: number = Date.now() ;
-    protected wfEndedAt: number = 0 ;
-    
-    protected wfParent: ParentWorkFlow = null ;
-    protected wfNodes: DInstanceId[] = [] ;
-
-    constructor() {
-        // default empty constructor
-    }
-
-    protected End() : void {
-        this.wfEnded = Date.now() ;
-    }
-
-
-
-    toJSON() : object {
-        return {
-            wfType: this.wfType,
-            wfInstanceId: this.wfInstanceId,
-            wfStartedAt: this.wfStartedAt,
-            wfEndedAt: this.wfEndedAt,
-            wfParent: this.wfParent,
-            wfNodes: this.wfNodes
-        }
-
-    }
-
-    toString() : string {
-        return JSON.stringify( toJSON(), null, 2 ) ;
-    }
-
-    toObject( wf: Workflow ) : void {
-        this.wfType = wf.wfType ;
-        this.wfInstanceId = wf.wfInstanceId ;
-        this.wfStartedAt = wf.wfStartedAt ;
-        this.wfEndedAt = wf.wfEndedAt ;
-        this.wfParent = wf.wfParent ;
-        this.wfNodes = wf.wfNodes ;
-    }
-
-}
-
-function wfSerialize( wfObject: object ) {
-
-}
-
-function wfDeserialize( wfType: string, wfInstanceId: DInstanceId ) : AbstractWorkflow {
-
-}
-
+    ndStartAt: number,
+    ndEndedAt: number,
+    ndSLA: number,
+    ndData: DBlock,
+    nd
+} ;
 
 /**
  * Boolean condition to check if this path of the workflow proceeds or terminates.
@@ -92,10 +31,40 @@ function wfDeserialize( wfType: string, wfInstanceId: DInstanceId ) : AbstractWo
  * @param wfData current workflow data.
  * @returns <code>false</code> to end this workflow path.
  */
-type NodePredicate = ( DBlock ) => boolean ;
+type Predicate = ( DBlock ) => boolean ;
+const PredicateTrue: Predicate = ( wfData: DBlock ) => true ;
+ 
+type NewNode = () => Node ;
+type PredicatePath = [ Predicate, NewNode ] ; // string node-type 
+ 
+type Field = {
+    name: string,
+    label: string,
+    tip: string,
+    default: DType,
+    value: DType,
+    validation: ( DType ) => boolean,
 
+}
+type Path = {
 
+}
+type FlowDefn = {
+    fields: Field[],
+    flows: Flows[]
+}
 
+type FlowType = {
+    wfType: WfType,
+    wfInstanceId: DInstanceId,
+    wfStartAt: number,
+    wfEndedAt: number,
+    wfNodes: DInstanceId[],
+    wfActiveNodes: DInstanceId[],
+    wfData: DBlock,
+    pndJoinKey: NdJoinKey,
+    pndInstanceId: DInstanceId,
+} ;
 
 
 abstract class Node {
@@ -109,8 +78,10 @@ abstract class Node {
     protected ndStartedAt: number = Date.now() ;
     protected ndEndedAt: number = 0 ;
 
+    protected paths: PredicatePath[] = [] ;
+
     constructor() {
-        // default constructor
+        super() ;
     }
 
     /**
@@ -127,19 +98,20 @@ abstract class Node {
      * @param wfData current workflow data.
      * @throws array of validation exceptions.
      */
-    public Submit( wfData: DBlock ) : void {
+    public Submit( wfData: DBlock ) : boolean {
         this.Validate( wfData ) ; // can throw validation exceptions
-        // create next nodes.
-        this.ndEndedAt = Date.now() ;
+        const result = this.CreateNext( wfData ) ;
+        if ( result ) {
+            this.ndEndedAt = Date.now() ;
+        }
+        return result ;
     }
 
     abstract protected CreateNext( wfData: DBlock ) : boolean ;
 
     toJSON() : object {
         return {
-            wfType: this.wfType,
             wfInstanceId: this.wfInstanceId,
-            ndType: this.ndType,
             ndInstanceId: this.ndInstanceId,
             ndStartedAt: this.ndStartedAt,
             ndEndedAt: this.ndEndedAt,
@@ -153,8 +125,75 @@ abstract class Node {
 
 }
 
-type Predicate = ( DBlock ) => boolean ;
-type PredicatePath = [ Predicate, WfType, NdType ] ; // string node-type
+abstract class Flow {
+
+    protected defn ;
+
+    protected flow: FlowType = {
+        wfType = null,
+        wfInstanceId = null,
+        wfStartAt = Date.now(),
+        wfEndedAt = 0,
+        wfNodes = [],
+        wfActiveNodes = [],
+        wfData = null,
+        pndJoinKey = null,
+        pndInstanceId = null,
+    } ;
+
+    constructor() {
+        super() ;
+        this.flow.wfType = this.constructor.name ;
+        this.flow.wfInstanceId = NewInstanceId() ;
+    }
+
+    constructor( serialized: { flow: FlowType } ) {
+        super() ;
+        this.flow = serialized.flow ;
+    }
+
+    End() : void {
+        this.wfEnded = Date.now() ;
+    }
+
+    AddNode( ndInstanceId: DInstanceId ) {
+        this.wfNodes.push( ndInstanceId ) ;
+        this.wfActiveNodes.push( ndInstanceId ) ;
+    }
+
+    SetNonActive( ndInstanceId: DInstanceId ) : void {
+        this.wfActiveNodes = this.wfActiveNodes.filter( id => ndInstanceId != id ) ;
+    }
+
+    toJSON() : object {
+        return { flow: this.flow } ;
+    }
+
+    public toString() : string {
+        return JSON.stringify( toJSON(), null, 2 ) ;
+    }
+
+    static Serialize( flow: FlowType ) : boolean {
+
+    }
+
+    static DeSerialize( wfInstanceId: DInstanceId ) : FlowType  {
+        return null ;
+    }
+
+}
+
+function wfSerialize( wfObject: object ) {
+
+}
+
+function wfDeserialize( wfInstanceId: DInstanceId ) : AbstractWorkflow {
+
+}
+
+
+
+
 
 abstract class IfNode extends Node {
 

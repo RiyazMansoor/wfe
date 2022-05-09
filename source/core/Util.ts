@@ -15,12 +15,12 @@ function timeString() : string {
     return new Date().toISOString().replace( /\D/g, "" ) ;
 }
 
-function instanceId( len: number = 24 ) : string {
-    let id: string = timeString() ;
+function NewInstanceId( len: number = 24 ) : string {
+    let id: string = timeString() + "_" ;
     return id + randomId( len - id.length ) ;
 }
 
 
 export = {
-    instanceId
+    NewInstanceId
 }
