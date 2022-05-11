@@ -5,7 +5,7 @@ enum WidgetWidth { Quarter, Third, Half, TwoThird, ThreeQuarter, Row }
 enum ValidationMethodEnum { Pattern, Email, Numeric, AlphaNumeric, StringLength, NumberRange, DateRange }
 
 type DataType = string | number ;
-type FieldName = string ;
+type DataKey = string ;
 type NodeClass = string ;
 type InputNode = string ;
 
@@ -19,7 +19,7 @@ type FieldValidation = {
 }
 
 type Field = {
-    name: FieldName,
+    key: DataKey,
     value: DataType,
     validations: FieldValidation[],
     ui: {
@@ -38,7 +38,7 @@ type Node = {
 type InputNode = Node & {
     title: string,
     fields: {
-        field: FieldName,
+        fieldkey: DataKey,
         visibility: FieldShowEnum
     }[],
 }
@@ -49,7 +49,8 @@ type Flow = {
     from: NodeClass,
     to: { 
         precondition: Predicate,
-        node:NodeClass,
+        type: "F" | "N",
+        class:NodeClass,
     }[]
 }
 
@@ -57,12 +58,16 @@ type FlowDefn = {
     fields: Field[],
     userinputs: InputNode[],
     flows: Flow[],
+    start: NodeClass
 }
 
 type DInstanceId = string ;
 type DFlowInstanceId = DInstanceId ;
 type DNodeInstanceId = DInstanceId ;
 type DBlock = Map<string, DataType|DBlock> ;
+type DBlock = {
+    [ index: string ]: string | number | DBlock
+}
 
 type Instance = {
     class: string,
@@ -84,6 +89,9 @@ type FlowInstance = {
     pndJoinKey: NdJoinKey,
     pndInstanceId: DInstanceId,
 }
+
+type NodeInstantiator = ( NodeClass ) => AbstractNodeInstance ;
+
 
 abstract class AbstractInstance {
 
@@ -117,10 +125,31 @@ abstract class AbstractFlowInstance extends AbstractInstance {
 
     protected flowDefn: FlowDefn = null ;
 
-    protected flowInstance: FlowInstance = {
+    protected nodeInstantiator: NodeInstantiator = null ;
 
+    protected flowInstance: FlowInstance = {
+        wfHistory =[],
+        wfActiveNodes = [],
+        wfData = null,
+        pndJoinKey = null,
+        pndInstanceId = null,
     }
-    
+
+    private nextNodes( currNode: NodeClass ) : NodeClass[] {
+        if ( !currNode ) {
+            return [ this.flowDefn.start ] ;
+        }
+        return this.flowDefn.flows.find( flow => flow.from == currNode.nodeInstance.class ).to
+                    .filter( ob => ob.precondition( this.flowInstance.wfData ) )
+                    .map( ob => ob.node ) ;
+    }
+
+    public NextStep( currNodeClass: NodeClass, data: DBlock ) {
+        if ( !currNodeClass ) {
+
+        }
+    }
+
     public toJSON() : { flowInstance: FlowInstance } {
         const obj = super.toJSON() ;
         obj.flowInstance = this.flowInstance ;
@@ -129,21 +158,15 @@ abstract class AbstractFlowInstance extends AbstractInstance {
 
 }
 
-abstract class Node {
+abstract class AbstractNodeInstance {
 
-    protected wfType: string ;
-    protected wfInstanceId: string ;
-
-    protected ndType: string ;
-    protected ndInstanceId: string ;
-
-    protected ndStartedAt: number = Date.now() ;
-    protected ndEndedAt: number = 0 ;
-
-    protected paths: PredicatePath[] = [] ;
 
     constructor() {
         super() ;
+    }
+
+    public PreCheck( wfData: DBlock ) : boolean {
+
     }
 
     /**
