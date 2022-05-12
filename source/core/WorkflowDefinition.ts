@@ -1,4 +1,7 @@
 
+import { NewInstanceId, PrimitiveDeepCopy } from "./Util";
+
+
 enum FieldShowEnum { HIDDEN, LOCKED, EDITABLE }
 enum WidgetEnum { TEXTBOX, TEXTAREA, DATE, CHECKBOX, OPTIONS, DROPDOWN }
 enum WidgetWidth { Quarter, Third, Half, TwoThird, ThreeQuarter, Row }
@@ -70,24 +73,30 @@ type DBlock = {
 }
 
 type Instance = {
-    class: string,
-    instanceId: DInstanceId,
-    startAt: number,
-    endedAt: number,
+    core: {
+        wfClass: string,
+        wfInstanceId: DFlowInstanceId,
+        startAt: number,
+        endedAt: number,
+    }
 }
 
 type NodeInstance = Instance & {
-    wfClass: string,
-    wfInstanceId: DFlowInstanceId,
-    ndSLA: number,
+    node: {
+        ndClass: string,
+        ndInstanceId: DNodeInstanceId,
+        ndSLA: number,
+    }
 } 
 
-type FlowInstance = {
-    wfHistory: DNodeInstanceId[],
-    wfActiveNodes: DInstanceId[],
-    wfData: DBlock,
-    pndJoinKey: NdJoinKey,
-    pndInstanceId: DInstanceId,
+type FlowInstance = Instance & {
+    flow: {
+        wfHistory: DNodeInstanceId[],
+        wfActiveNodes: DInstanceId[],
+        wfData: DBlock,
+        pndJoinKey: NdJoinKey,
+        pndInstanceId: DInstanceId,
+    }
 }
 
 type NodeInstantiator = ( NodeClass ) => AbstractNodeInstance ;
@@ -95,24 +104,26 @@ type NodeInstantiator = ( NodeClass ) => AbstractNodeInstance ;
 
 abstract class AbstractInstance {
 
-    protected instance: Instance = {
-        class: this.constructor.name,
-        instanceId: NewInstanceId(),
-        startedAt: Date.now(),
-        endedAt: 0
+    protected core: Instance = {
+        core: {
+            wfClass: this.constructor.name,
+            wfInstanceId: NewInstanceId(),
+            startedAt: Date.now(),
+            endedAt: 0,
+        }
     }
 
     constructor() {
         super() ;
     }
 
-    constructor( serialized: { instance: Instance } ) {
+    constructor( serialized: Instance ) {
         super() ;
-        this.instance = serialized.instance ;
+        this.core.core = serialized.core ;
     }
 
-    public toJSON() : { instance: Instance } {
-        return { instance: this.instance } ;
+    public toJSON() : Instance {
+        return this.core ;
     }
 
     public toString() : string {
@@ -127,12 +138,35 @@ abstract class AbstractFlowInstance extends AbstractInstance {
 
     protected nodeInstantiator: NodeInstantiator = null ;
 
-    protected flowInstance: FlowInstance = {
-        wfHistory =[],
-        wfActiveNodes = [],
-        wfData = null,
-        pndJoinKey = null,
-        pndInstanceId = null,
+    protected flowInstance: FlowInstance = { 
+        flow: {
+            wfHistory =[],
+            wfActiveNodes = [],
+            wfData = null,
+            pndJoinKey = null,
+            pndInstanceId = null,
+        }
+    }
+
+    constructor() {
+        super() ;
+    }
+
+    constructor( serialized: { flowInstance: FlowInstance } ) {
+        super( flowInstance ) ;
+        this.flowInstance.flow = serialized.flow ;
+    }
+
+    public Start() {
+
+    }
+
+    public Next() {
+
+    }
+
+    public End() {
+
     }
 
     private nextNodes( currNode: NodeClass ) : NodeClass[] {
@@ -152,7 +186,7 @@ abstract class AbstractFlowInstance extends AbstractInstance {
 
     public toJSON() : { flowInstance: FlowInstance } {
         const obj = super.toJSON() ;
-        obj.flowInstance = this.flowInstance ;
+        obj.flow = this.flowInstance.flow ;
         return obj ;
     }
 
@@ -165,8 +199,8 @@ abstract class AbstractNodeInstance {
         super() ;
     }
 
-    public PreCheck( wfData: DBlock ) : boolean {
-
+    public Predicate( wfData: DBlock ) : boolean {
+        return true ;
     }
 
     /**

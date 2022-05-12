@@ -15,12 +15,23 @@ function timeString() : string {
     return new Date().toISOString().replace( /\D/g, "" ) ;
 }
 
-function NewInstanceId( len: number = 24 ) : string {
+function NewInstanceId( len: number = 30 ) : string {
     let id: string = timeString() + "_" ;
     return id + randomId( len - id.length ) ;
 }
 
+function PrimitiveDeepCopy( from: object, to: object ) : void {
+    for ( const prp in from ) {
+        if ( prp in to || typeof from.prp != typeof from.to ) continue ;
+        if ( typeof prp == 'object' ) {
+            PrimitiveDeepCopy( from.prp, to.prp ) ;
+        } else {
+            to.prp = from.prp ;
+        }
+    }
+}
 
 export = {
-    NewInstanceId
+    NewInstanceId,
+    PrimitiveDeepCopy
 }
