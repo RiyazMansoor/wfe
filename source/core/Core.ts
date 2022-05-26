@@ -14,13 +14,42 @@ type DataType = string | number ;
 type DataBlock = {
     [index: string]: DataType | DBlock
 } ;
-type FormData = DataBlock ;
+// type FormData = DataBlock ;
 
 type WfType = string ;
 type WfInstanceId = string ;
 type NdType = string ;
 type NdInstanceId = string ;
- 
+
+type BaseNd = {
+    ndType: NdType,
+    ndInstanceId: NdInstanceId,
+    wfType: WfType,
+    wfInstanceId: WfInstanceId,
+    ndStartAt: DateTime,
+    ndEndedAt: DateTime,
+} ;
+
+type BaseWf = {
+    wfType: WfType,
+    wfInstanceId: WfInstanceId,
+    wfStartAt: DateTime,
+    wfEndedAt: DateTime,
+    wfData: DBlock,
+} ;
+
+
+type InputNode = {
+    ndSLA: SLA,
+    ndReadData: DataBlock,
+    ndEditData: DataBlock,
+    ndStaffRole: StaffRole,
+    // ndForm: Form
+}
+
+
+
+
 type Input = {
     key: string,
     value: DataType,
@@ -42,19 +71,6 @@ type Form = {
 }
  
 
-type NodeType = {
-    ndType: NdType,
-    ndInstanceId: NdInstanceId,
-    wfType: WfType,
-    wfInstanceId: WfInstanceId,
-    ndStartAt: DateTime,
-    ndEndedAt: DateTime,
-    ndSLA: SLA,
-    ndReadData: DataBlock,
-    ndEditData: DataBlock,
-    ndStaffRole: StaffRole,
-    ndForm: Form
-} ;
 
 /**
  * Boolean condition to check if this path of the workflow proceeds or terminates.
@@ -91,20 +107,33 @@ type FlowType = {
 
 abstract class Node {
 
-    protected wfType: string ;
-    protected wfInstanceId: string ;
+    protected baseNd: BaseNd = {
+        ndType: null,
+        ndInstanceId: null,
+        wfType: WfType,
+        wfInstanceId: WfInstanceId,
+        ndStartAt: Date.now(),
+        ndEndedAt: 0,
+    } ;
 
-    protected ndType: string ;
-    protected ndInstanceId: string ;
-
-    protected ndStartedAt: number = Date.now() ;
-    protected ndEndedAt: number = 0 ;
-
-    protected paths: PredicatePath[] = [] ;
-
-    constructor() {
+    constructor( wfType: WfType, wfInstanceId: WfInstanceId ) {
         super() ;
+        this.baseNd.NdType = this.constructor.name ;
+        this.baseNd.NdInstanceId = NewInstanceId() ;
+        this.baseNd.wfType = wfType ;
+        this.baseNd.wfInstanceId = wfInstanceId ;
     }
+
+    constructor( serialized: { baseNd: BaseNd } ) {
+        super() ;
+        this.baseNd = serialized.baseNd ;
+    }
+
+     FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : Flow {
+        return null ;
+    }
+
+    abstract execPredicate( wfData: DataBlock ) : boolean ; // TODO boolean
 
     /**
      * Where required every node must implement data validation.
@@ -131,14 +160,8 @@ abstract class Node {
 
     abstract protected CreateNext( wfData: DBlock ) : boolean ;
 
-    toJSON() : object {
-        return {
-            wfInstanceId: this.wfInstanceId,
-            ndInstanceId: this.ndInstanceId,
-            ndStartedAt: this.ndStartedAt,
-            ndEndedAt: this.ndEndedAt,
-        }
-
+    toJSON() : { baseNd: BaseNd } {
+        return { baseNd: this.baseNd } ;
     }
 
     toString() : string {
