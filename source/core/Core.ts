@@ -21,6 +21,8 @@ type WfInstanceId = string ;
 type NdType = string ;
 type NdInstanceId = string ;
 
+enum NodeAction { Submit, Review, Reject, Approve, UserResubmit } ;
+
 type BaseNd = {
     ndType: NdType,
     ndInstanceId: NdInstanceId,
@@ -28,8 +30,11 @@ type BaseNd = {
     wfInstanceId: WfInstanceId,
     ndStartAt: DateTime,
     ndEndedAt: DateTime,
+    ndActions: {
+        [index: NodeAction]: NdType
+    },
+    ndFlows: WfType[]
 } ;
-
 type BaseWf = {
     wfType: WfType,
     wfInstanceId: WfInstanceId,
@@ -38,6 +43,11 @@ type BaseWf = {
     wfData: DBlock,
 } ;
 
+type Message = {
+    type: "I"|"A"|"E",
+    key: string,
+    message: string
+}
 
 type InputNode = {
     ndSLA: SLA,
@@ -105,7 +115,9 @@ type FlowType = {
 } ;
 
 
-abstract class Node {
+
+
+abstract class BaseNode {
 
     protected baseNd: BaseNd = {
         ndType: null,
@@ -114,10 +126,14 @@ abstract class Node {
         wfInstanceId: WfInstanceId,
         ndStartAt: Date.now(),
         ndEndedAt: 0,
+        ndActions: {}
     } ;
 
-    constructor( wfType: WfType, wfInstanceId: WfInstanceId ) {
+    constructor( wfType: WfType, wfInstanceId: WfInstanceId, wfData: DataBlock ) {
         super() ;
+        this.wfData = fetchWf( wfType, wfInstanceId ) ;
+        const messages: Message[] = this.execPredicate( wfData ) ;
+        if ( messages.length > 0 ) throw messages ;
         this.baseNd.NdType = this.constructor.name ;
         this.baseNd.NdInstanceId = NewInstanceId() ;
         this.baseNd.wfType = wfType ;
@@ -129,19 +145,27 @@ abstract class Node {
         this.baseNd = serialized.baseNd ;
     }
 
-     FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : Flow {
+    static FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseWf {
         return null ;
     }
 
-    abstract execPredicate( wfData: DataBlock ) : boolean ; // TODO boolean
+    static SaveWf(  wfType: WfType, wfInstanceId: WfInstanceId, newWfData: DataBlock ) : DataBlock {
+        const baseWf: BaseWf = FetchWf( wfType, wfInstanceId ) ;
+        const wfData: DataBlock = baseWf.dataMergeSave( newWfData ) ;
+        return wfData ;
+    }
+
+    execPredicate( wfData: DataBlock ) : Message[] {
+        return [] ; // default pass through predicate
+    }
 
     /**
      * Where required every node must implement data validation.
      * @param wfData current workflow data.
      * @throws array of validation exceptions.
      */
-    protected Validate( wfData: DBlock ) : void {
-        // default implementation - no validation required / pass through
+    protected submitValidate( wfData: DBlock ) : Message[] {
+        return [] ; // default - no validation required / pass through
     }
 
     /**
@@ -149,8 +173,11 @@ abstract class Node {
      * @param wfData current workflow data.
      * @throws array of validation exceptions.
      */
-    public Submit( wfData: DBlock ) : boolean {
-        this.Validate( wfData ) ; // can throw validation exceptions
+    public Submit( newWfData: DataBlock ) : boolean {
+        const messages: Message[] = this.submitValidate( newWfData ) ;
+        if ( messages.length > 0 ) throw messages ;
+        // create next node[s]
+        const wfData: DataBlock = SaveWf( wfData ) ;
         const result = this.CreateNext( wfData ) ;
         if ( result ) {
             this.ndEndedAt = Date.now() ;
