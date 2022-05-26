@@ -4,25 +4,56 @@ import { NewInstanceId } from "./Utils" ;
 enum NodeStatus { CREATED, READY, STARTED, ENDED }
 
 type Email = string ;
-type WfType = string ;
-type NdType = string ;
-type NdJoinKey = string ;
-type DUsername = string ;
-type DInstanceId = string ;
+type DateTime = number ;
+type Html = string ;
+type EfaasUsername = string ;
+type StaffRole = string ;
+type SLA = number ; // work hours
 
-type DType = string | number ;
-type DBlock = Map<string, DType|DBlock> ;
+type DataType = string | number ;
+type DataBlock = {
+    [index: string]: DataType | DBlock
+} ;
+type FormData = DataBlock ;
+
+type WfType = string ;
+type WfInstanceId = string ;
+type NdType = string ;
+type NdInstanceId = string ;
+ 
+type Input = {
+    key: string,
+    value: DataType,
+    default: DataType,
+    label: string,
+    tip: Html,
+//    validation: ( DType ) => boolean,
+}
+
+enum InputWidth { Quarter, Half, ThreeQuarter, Third, TwoThird, Rest }
+type InputRow = [
+    { width: InputWidth, input: Input }
+]
+type Form = {
+    title: string,
+    inputrows: InputRow[],
+    actions: Actions[];
+
+}
+ 
 
 type NodeType = {
     ndType: NdType,
-    ndInstanceId: DInstanceId,
+    ndInstanceId: NdInstanceId,
     wfType: WfType,
-    wfInstanceId: DInstanceId,
-    ndStartAt: number,
-    ndEndedAt: number,
-    ndSLA: number,
-    ndData: DBlock,
-    nd
+    wfInstanceId: WfInstanceId,
+    ndStartAt: DateTime,
+    ndEndedAt: DateTime,
+    ndSLA: SLA,
+    ndReadData: DataBlock,
+    ndEditData: DataBlock,
+    ndStaffRole: StaffRole,
+    ndForm: Form
 } ;
 
 /**
@@ -37,15 +68,6 @@ const PredicateTrue: Predicate = ( wfData: DBlock ) => true ;
 type NewNode = () => Node ;
 type PredicatePath = [ Predicate, NewNode ] ; // string node-type 
  
-type Field = {
-    name: string,
-    label: string,
-    tip: string,
-    default: DType,
-    value: DType,
-    validation: ( DType ) => boolean,
-
-}
 type Path = {
 
 }
