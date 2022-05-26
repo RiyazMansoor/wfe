@@ -28,12 +28,14 @@ type BaseNd = {
     ndInstanceId: NdInstanceId,
     wfType: WfType,
     wfInstanceId: WfInstanceId,
+    ndStaffRole: StaffRole,
+    ndStaffUser: EfaasUsername,
     ndStartAt: DateTime,
     ndEndedAt: DateTime,
     ndActions: {
         [index: NodeAction]: NdType
     },
-    ndFlows: WfType[]
+    ndFlows: WfType[],
 } ;
 type BaseWf = {
     wfType: WfType,
@@ -119,40 +121,40 @@ type FlowType = {
 
 abstract class BaseNode {
 
+    static FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseWf {
+        return null ;
+    }
+
+    static SaveNd(  baseNd: BaseWf ) : void {
+        // TODO
+    }
+
     protected baseNd: BaseNd = {
         ndType: null,
         ndInstanceId: null,
         wfType: WfType,
         wfInstanceId: WfInstanceId,
+        ndStaffRole: null,
+        ndStaffUser: null,
         ndStartAt: Date.now(),
         ndEndedAt: 0,
-        ndActions: {}
+        ndActions: {},
+        ndflows: [],
     } ;
 
-    constructor( wfType: WfType, wfInstanceId: WfInstanceId, wfData: DataBlock ) {
+    constructor( baseWf: BaseWf ) {
         super() ;
-        this.wfData = fetchWf( wfType, wfInstanceId ) ;
-        const messages: Message[] = this.execPredicate( wfData ) ;
+        const messages: Message[] = this.execPredicate( baseWf.wfData ) ;
         if ( messages.length > 0 ) throw messages ;
         this.baseNd.NdType = this.constructor.name ;
         this.baseNd.NdInstanceId = NewInstanceId() ;
-        this.baseNd.wfType = wfType ;
-        this.baseNd.wfInstanceId = wfInstanceId ;
+        this.baseNd.wfType = baseWf.wfType ;
+        this.baseNd.wfInstanceId = baseWf.wfInstanceId ;
     }
 
     constructor( serialized: { baseNd: BaseNd } ) {
         super() ;
         this.baseNd = serialized.baseNd ;
-    }
-
-    static FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseWf {
-        return null ;
-    }
-
-    static SaveWf(  wfType: WfType, wfInstanceId: WfInstanceId, newWfData: DataBlock ) : DataBlock {
-        const baseWf: BaseWf = FetchWf( wfType, wfInstanceId ) ;
-        const wfData: DataBlock = baseWf.dataMergeSave( newWfData ) ;
-        return wfData ;
     }
 
     execPredicate( wfData: DataBlock ) : Message[] {
@@ -173,12 +175,17 @@ abstract class BaseNode {
      * @param wfData current workflow data.
      * @throws array of validation exceptions.
      */
-    public Submit( newWfData: DataBlock ) : boolean {
+    public Submit( newWfData: DataBlock ) : void {
         const messages: Message[] = this.submitValidate( newWfData ) ;
         if ( messages.length > 0 ) throw messages ;
         // create next node[s]
-        const wfData: DataBlock = SaveWf( wfData ) ;
-        const result = this.CreateNext( wfData ) ;
+        const wfType: WfType = SaveWf( wfData ) ;
+        const nextNode: NodeAction = this.nodeAction( newWfData ) ;
+        if ( !nextNode ) {
+            this.baseNd.ndEndedAt = Date.now() ;
+            this.save() ;
+        }
+        const newNode: BaseNd = wfType.newNode( nextNode ) ;
         if ( result ) {
             this.ndEndedAt = Date.now() ;
         }
