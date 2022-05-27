@@ -51,15 +51,6 @@ function SaveNd( ndObject: { baseNd: BaseNd } ) : void {
     // TODO
 }
 
-type BaseInputNd = {
-    ndSLA: SLA,
-    ndStaffRole: StaffRole,
-    ndStaffUser: EfaasUsername,
-    ndStatus: NodeStatus,
-    ndEditData: Key[],
-}
-
-
 type BaseWf = {
     wfType: WfType,
     wfInstanceId: WfInstanceId,
@@ -78,6 +69,142 @@ function SaveWf( baseWf: BaseWf ) : void {
     // TODO
 }
 
+abstract class BaseNode {
+
+    protected baseNd: BaseNd = {
+        ndType: null,
+        ndInstanceId: null,
+        wfType: WfType,
+        wfInstanceId: WfInstanceId,
+        ndCreatedAt: Date.now(),
+        ndClosedAt: 0,
+        ndActions: {},
+        ndFlows: [],
+    } ;
+
+    // does not save this Nd
+    constructor( baseWf: BaseWf ) {
+        super() ;
+        const messages: Message[] = this.execPredicate( baseWf.wfData ) ;
+        if ( messages.length > 0 ) throw messages ;
+        // all good - construct this node
+        this.baseNd.NdType = this.constructor.name ;
+        this.baseNd.NdInstanceId = NewInstanceId() ;
+        this.baseNd.wfType = baseWf.wfType ;
+        this.baseNd.wfInstanceId = baseWf.wfInstanceId ;
+    }
+
+    constructor( serialized: { baseNd: BaseNd } ) {
+        super() ;
+        this.baseNd = serialized.baseNd ;
+    }
+
+    // default pass through predicate, else over ride
+    execPredicate( wfData: DataBlock ) : Message[] {
+        return [] ; 
+    }
+
+    // default - no validation required / pass through
+    protected validateSubmission( ndData: DataBlock ) : Message[] {
+        return [] ; 
+    }
+
+    // default - no data merge is required
+    protected mergeData( ndData: DataBlock, wfData: DataBlock ) : void {
+    }
+
+    abstract protected nextNodeTypes( ndData: DataBlock ) : NdType[] ;
+
+    Submit( ndData: DataBlock ) : void {
+        const messages: Message[] = this.validateSubmission( ndData ) ;
+        if ( messages.length > 0 ) throw messages ;
+        // create next node[s]
+        this.baseNd.ndClosedAt = Date.now() ;
+        const baseFlow: BaseFlow = FetchWf( this.baseNd.wfType, this.baseNd.wfInstanceId ) ;
+        this.mergeData( ndData, baseFlow.baseWf.wfData ) ; // todo
+        const nextNdTypes: NdType[] = this.nextNodeTypes( ndData ) ;
+        for ( const ndType of nextNdTypes ) {
+            baseFlow.createNode( ndType ).save() ; 
+        }
+        this.save() ;
+        if ( nextNdTypes.length == 0 ) baseWf.close() ;
+        baseFlow.save() ;
+    }
+
+    save() : void {
+        SaveNd( this.toJSON() ) ;
+    }
+
+    toJSON() : { baseNd: BaseNd } {
+        return { baseNd: this.baseNd } ;
+    }
+
+    toString() : string {
+        return JSON.stringify( toJSON(), null, 2 ) ;
+    }    
+
+}
+
+abstract class BaseFlow {
+
+    protected baseWf: BaseWf = {
+        wfType = null,
+        wfInstanceId = null,
+        wfCreatedAt = Date.now(),
+        wfClosedAt = 0,
+        wfData = null,
+        pwfType = null,
+        pwfInstanceId = null,
+    } ;
+
+    constructor( startData: DataBlock ) {
+        super() ;
+        const messages: Message[] = this.execPredicate( startData ) ;
+        if ( messages.length > 0 ) throw messages ;
+        // all ok, construct workflow
+        this.baseWf.wfType = this.constructor.name ;
+        this.baseWf.wfInstanceId = NewInstanceId() ;
+        this.init( startData ) ;
+    }
+
+    constructor( serialized: { baseWf: BaseWf } ) {
+        super() ;
+        this.baseWf = serialized.baseWf ;
+    }
+
+    // default pass through predicate, else over ride
+    execPredicate( startData: DataBlock ) : Message[] {
+        return [] ; 
+    }
+
+    abstract init( startData: DataBlock ) : void ;
+
+    abstract createNode( ndType: NdType ) : BaseNode ;
+
+    abstract updateFromSubFlow( swfData: DataBlock ) ;
+
+    close() {
+        this.baseWf.wfClosedAt = Date.now() ;
+        if ( this.baseWf.pwfType ) {
+            const pbaseFlow: BaseFlow = FetchWf( this.baseWf.pwfType, this.baseWf.pwfInstanceId ) ;
+            pbaseFlow.updateFromSubFlow( this.baseWf.wfData ) ;
+            pbaseFlow.save() ;
+        }
+    }
+
+    save() : void {
+        SaveWf( this.toJSON() ) ;
+    }
+
+    toJSON() : { baseWf: BaseWf } {
+        return { baseWf: this.baseWf } ;
+    }
+
+    toString() : string {
+        return JSON.stringify( toJSON(), null, 2 ) ;
+    }
+
+}
 
 
 
@@ -90,6 +217,15 @@ function SaveWf( baseWf: BaseWf ) : void {
 
 
 
+
+
+type BaseInputNd = {
+    ndSLA: SLA,
+    ndStaffRole: StaffRole,
+    ndStaffUser: EfaasUsername,
+    ndStatus: NodeStatus,
+    ndEditData: Key[],
+}
 
 
 type Input = {
@@ -147,86 +283,6 @@ type FlowType = {
 } ;
 
 
-
-abstract class BaseNode {
-
-    protected baseNd: BaseNd = {
-        ndType: null,
-        ndInstanceId: null,
-        wfType: WfType,
-        wfInstanceId: WfInstanceId,
-        ndCreatedAt: Date.now(),
-        ndClosedAt: 0,
-        ndActions: {},
-        ndFlows: [],
-    } ;
-
-    // does not save this Nd
-    constructor( baseWf: BaseWf ) {
-        super() ;
-        const messages: Message[] = this.execPredicate( baseWf.wfData ) ;
-        if ( messages.length > 0 ) throw messages ;
-        // all good - construct this node
-        this.baseNd.NdType = this.constructor.name ;
-        this.baseNd.NdInstanceId = NewInstanceId() ;
-        this.baseNd.wfType = baseWf.wfType ;
-        this.baseNd.wfInstanceId = baseWf.wfInstanceId ;
-    }
-
-    constructor( serialized: { baseNd: BaseNd } ) {
-        super() ;
-        this.baseNd = serialized.baseNd ;
-    }
-
-    // default pass through predicate, else over ride
-    execPredicate( wfData: DataBlock ) : Message[] {
-        return [] ; 
-    }
-
-    protected validateSubmission( ndData: DataBlock ) : Message[] {
-        return [] ; // default - no validation required / pass through
-    }
-
-    protected mergeData( ndData: DataBlock, wfData: DataBlock ) : void {
-        // default
-    }
-
-    abstract protected nextNodeTypes( ndData: DataBlock ) : NdType[] ;
-
-    /**
-     * 
-     * @param wfData current workflow data.
-     * @throws array of validation exceptions.
-     */
-    Submit( ndData: DataBlock ) : void {
-        const messages: Message[] = this.validateSubmission( ndData ) ;
-        if ( messages.length > 0 ) throw messages ;
-        // create next node[s]
-        this.baseNd.ndClosedAt = Date.now() ;
-        const baseFlow: BaseFlow = FetchWf( this.baseNd.wfType, this.baseNd.wfInstanceId ) ;
-        this.mergeData( ndData, baseFlow.baseWf.wfData ) ; // todo
-        const nextNdTypes: NdType[] = this.nextNodeTypes( ndData ) ;
-        for ( const ndType of nextNdTypes ) {
-            baseFlow.createNode( ndType ).save() ; 
-        }
-        this.save() ;
-        if ( nextNdTypes.length == 0 ) baseWf.close() ;
-        baseFlow.save() ;
-    }
-
-    save() : void {
-        SaveNd( this.toJSON ) ;
-    }
-
-    toJSON() : { baseNd: BaseNd } {
-        return { baseNd: this.baseNd } ;
-    }
-
-    toString() : string {
-        return JSON.stringify( toJSON(), null, 2 ) ;
-    }    
-
-}
 
 abstract class BaseInputNode extends BaseNode {
 
@@ -297,67 +353,6 @@ abstract class BaseInputNode extends BaseNode {
 
 }
 
-
-abstract class BaseFlow {
-
-    protected baseWf: BaseWf = {
-        wfType = null,
-        wfInstanceId = null,
-        wfCreatedAt = Date.now(),
-        wfClosedAt = 0,
-        wfData = null,
-        pwfType = null,
-        pwfInstanceId = null,
-    } ;
-
-    constructor( startData: DataBlock ) {
-        super() ;
-        const messages: Message[] = this.execPredicate( startData ) ;
-        if ( messages.length > 0 ) throw messages ;
-        // all ok, construct workflow
-        this.baseWf.wfType = this.constructor.name ;
-        this.baseWf.wfInstanceId = NewInstanceId() ;
-        this.init( startData ) ;
-    }
-
-    constructor( serialized: { baseWf: BaseWf } ) {
-        super() ;
-        this.baseWf = serialized.baseWf ;
-    }
-
-    // default pass through predicate, else over ride
-    execPredicate( startData: DataBlock ) : Message[] {
-        return [] ; 
-    }
-
-    abstract init( startData: DataBlock ) : void ;
-
-    abstract createNode( ndType: NdType ) : BaseNode ;
-
-    abstract updateFromSubFlow( swfData: DataBlock ) ;
-
-    close() {
-        this.baseWf.wfClosedAt = Date.now() ;
-        if ( this.baseWf.pwfType ) {
-            const pbaseFlow: BaseFlow = FetchWf( this.baseWf.pwfType, this.baseWf.pwfInstanceId ) ;
-            pbaseFlow.updateFromSubFlow( this.baseWf.wfData ) ;
-            pbaseFlow.save() ;
-        }
-    }
-
-    save() : void {
-        SaveWf( this.toJSON() ) ;
-    }
-
-    toJSON() : { baseWf: BaseWf } {
-        return { baseWf: this.baseWf } ;
-    }
-
-    toString() : string {
-        return JSON.stringify( toJSON(), null, 2 ) ;
-    }
-
-}
 
 
 
