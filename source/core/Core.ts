@@ -1,10 +1,10 @@
 
 import { NewInstanceId } from "./Utils" ;
 
-enum NodeStatus { CREATED, READY, STARTED, ENDED }
 
 type Email = string ;
 type DateTime = number ;
+type Key = string ;
 type Html = string ;
 type EfaasUsername = string ;
 type StaffRole = string ;
@@ -21,6 +21,13 @@ type WfInstanceId = string ;
 type NdType = string ;
 type NdInstanceId = string ;
 
+type Message = {
+    type: "I"|"A"|"E",
+    key: Key,
+    message: string
+}
+
+enum NodeStatus { Waiting, Started, Ended }
 enum NodeAction { Submit, Review, Reject, Approve, UserResubmit } ;
 
 type BaseNd = {
@@ -28,15 +35,31 @@ type BaseNd = {
     ndInstanceId: NdInstanceId,
     wfType: WfType,
     wfInstanceId: WfInstanceId,
-    ndStaffRole: StaffRole,
-    ndStaffUser: EfaasUsername,
-    ndStartAt: DateTime,
-    ndEndedAt: DateTime,
+    ndCreatedAt: DateTime,
+    ndCompletedAt: DateTime,
     ndActions: {
         [index: NodeAction]: NdType
     },
     ndFlows: WfType[],
 } ;
+
+function FetchNd( ndType: ndType, ndInstanceId: ndInstanceId ) : BaseNd {
+    // TODO
+    return null ;
+}
+function SaveNd( baseNd: BaseNd ) : void {
+    // TODO
+}
+
+type BaseInputNd = {
+    ndSLA: SLA,
+    ndStaffRole: StaffRole,
+    ndStaffUser: EfaasUsername,
+    ndStatus: NodeStatus,
+    ndEditData: Key[],
+}
+
+
 type BaseWf = {
     wfType: WfType,
     wfInstanceId: WfInstanceId,
@@ -45,19 +68,24 @@ type BaseWf = {
     wfData: DBlock,
 } ;
 
-type Message = {
-    type: "I"|"A"|"E",
-    key: string,
-    message: string
+function FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseWf {
+    // TODO
+    return null ;
+}
+function SaveWf( baseWf: BaseWf ) : void {
+    // TODO
 }
 
-type InputNode = {
-    ndSLA: SLA,
-    ndReadData: DataBlock,
-    ndEditData: DataBlock,
-    ndStaffRole: StaffRole,
-    // ndForm: Form
-}
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -118,34 +146,25 @@ type FlowType = {
 
 
 
-
 abstract class BaseNode {
-
-    static FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseWf {
-        return null ;
-    }
-
-    static SaveNd(  baseNd: BaseWf ) : void {
-        // TODO
-    }
 
     protected baseNd: BaseNd = {
         ndType: null,
         ndInstanceId: null,
         wfType: WfType,
         wfInstanceId: WfInstanceId,
-        ndStaffRole: null,
-        ndStaffUser: null,
-        ndStartAt: Date.now(),
-        ndEndedAt: 0,
+        ndCreatedAt: Date.now(),
+        ndCompletedAt: 0,
         ndActions: {},
-        ndflows: [],
+        ndFlows: [],
     } ;
 
+    // does not save this Nd
     constructor( baseWf: BaseWf ) {
         super() ;
         const messages: Message[] = this.execPredicate( baseWf.wfData ) ;
         if ( messages.length > 0 ) throw messages ;
+        // all good - construct this node
         this.baseNd.NdType = this.constructor.name ;
         this.baseNd.NdInstanceId = NewInstanceId() ;
         this.baseNd.wfType = baseWf.wfType ;
@@ -157,15 +176,11 @@ abstract class BaseNode {
         this.baseNd = serialized.baseNd ;
     }
 
+    // default pass through predicate, else over ride
     execPredicate( wfData: DataBlock ) : Message[] {
-        return [] ; // default pass through predicate
+        return [] ; 
     }
 
-    /**
-     * Where required every node must implement data validation.
-     * @param wfData current workflow data.
-     * @throws array of validation exceptions.
-     */
     protected submitValidate( wfData: DBlock ) : Message[] {
         return [] ; // default - no validation required / pass through
     }
@@ -175,7 +190,7 @@ abstract class BaseNode {
      * @param wfData current workflow data.
      * @throws array of validation exceptions.
      */
-    public Submit( newWfData: DataBlock ) : void {
+    Submit( newWfData: DataBlock ) : void {
         const messages: Message[] = this.submitValidate( newWfData ) ;
         if ( messages.length > 0 ) throw messages ;
         // create next node[s]
@@ -203,6 +218,76 @@ abstract class BaseNode {
     }    
 
 }
+
+abstract class BaseInputNode extends BaseNode {
+
+    protected ndStatus: NodeStatus = NodeStatus.CREATED ;
+    protected ndUser: string = "" ;
+
+    public Start( user: string ) : void {
+        if ( this.ndStatus != NodeStatus.READY ) {
+            throw `Node type=${this.ndName} instance=${this.ndInstanceId} is not READY.` ;
+        }
+        this.ndStatus = NodeStatus.STARTED ;
+        this.ndUser = user ;
+    }
+
+    public Return( user: string ) : void {
+        if ( this.ndStatus != NodeStatus.STARTED ) {
+            throw `Node type=${this.ndName} instance=${this.ndInstanceId} has not been STARTED.` ;
+        }
+        if ( this.ndUser != user ) {
+            throw `Node type=${this.ndName} instance=${this.ndInstanceId} staff=${this.ndUser} already working.` ;
+        }
+        this.ndUser = "" ;
+        this.ndStatus = NodeStatus.READY ;
+    }
+
+
+    /**
+     * 
+     * @param wfData current workflow data.
+     * @throws array of validation exceptions.
+     */
+    public Submit( wfData: DBlock, user: string ) : void {
+        if ( this.ndUser != user ) {
+            throw `Node type=${this.ndName} instance=${this.ndInstanceId} staff=${this.ndUser} already working.` ;
+        }
+        this.Validate( wfData ) ; // can throw validation exceptions
+        // create next nodes.
+        this.ndEndedAt = Date.now() ;
+        this.ndStatus = NodeStatus.ENDED ;
+    }
+
+
+    /**
+     * Some nodes require user input. This property is the indicator.
+     * @returns <code>true</code> if user input required
+     */
+    public HasInput() : boolean {
+        return false ;
+    }
+
+    /**
+     * For nodes that require user input, returns the html to cpature user input.
+     * @param wfData current workflow data.
+     * @returns <code>html</code> input form as a string to capture user input.
+     * @see #HasInput
+     */
+    public InputForm( wfData: DBlock ) : string {
+        return undefined ;
+    }
+
+    toJSON() : object {
+        const obj = super.toJSON() ;
+        obj.ndStatus = this.ndStatus ;
+        obj.ndUser = this.ndUser ;
+        return obj ;
+    }
+
+
+}
+
 
 abstract class Flow {
 
@@ -321,74 +406,6 @@ abstract class BranchOutNode extends Node {
 
 
 
-abstract class InputNode extends Node {
-
-    protected ndStatus: NodeStatus = NodeStatus.CREATED ;
-    protected ndUser: string = "" ;
-
-    public Start( user: string ) : void {
-        if ( this.ndStatus != NodeStatus.READY ) {
-            throw `Node type=${this.ndName} instance=${this.ndInstanceId} is not READY.` ;
-        }
-        this.ndStatus = NodeStatus.STARTED ;
-        this.ndUser = user ;
-    }
-
-    public Return( user: string ) : void {
-        if ( this.ndStatus != NodeStatus.STARTED ) {
-            throw `Node type=${this.ndName} instance=${this.ndInstanceId} has not been STARTED.` ;
-        }
-        if ( this.ndUser != user ) {
-            throw `Node type=${this.ndName} instance=${this.ndInstanceId} staff=${this.ndUser} already working.` ;
-        }
-        this.ndUser = "" ;
-        this.ndStatus = NodeStatus.READY ;
-    }
-
-
-    /**
-     * 
-     * @param wfData current workflow data.
-     * @throws array of validation exceptions.
-     */
-    public Submit( wfData: DBlock, user: string ) : void {
-        if ( this.ndUser != user ) {
-            throw `Node type=${this.ndName} instance=${this.ndInstanceId} staff=${this.ndUser} already working.` ;
-        }
-        this.Validate( wfData ) ; // can throw validation exceptions
-        // create next nodes.
-        this.ndEndedAt = Date.now() ;
-        this.ndStatus = NodeStatus.ENDED ;
-    }
-
-
-    /**
-     * Some nodes require user input. This property is the indicator.
-     * @returns <code>true</code> if user input required
-     */
-    public HasInput() : boolean {
-        return false ;
-    }
-
-    /**
-     * For nodes that require user input, returns the html to cpature user input.
-     * @param wfData current workflow data.
-     * @returns <code>html</code> input form as a string to capture user input.
-     * @see #HasInput
-     */
-    public InputForm( wfData: DBlock ) : string {
-        return undefined ;
-    }
-
-    toJSON() : object {
-        const obj = super.toJSON() ;
-        obj.ndStatus = this.ndStatus ;
-        obj.ndUser = this.ndUser ;
-        return obj ;
-    }
-
-
-}
 
 class InputNode extends AbstractNode {
 
