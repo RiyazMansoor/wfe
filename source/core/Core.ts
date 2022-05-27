@@ -234,6 +234,7 @@ type Input = {
     default: DataType,
     label: string,
     tip: Html,
+    required: boolean,
 //    validation: ( DType ) => boolean,
 }
 
@@ -241,46 +242,11 @@ enum InputWidth { Quarter, Half, ThreeQuarter, Third, TwoThird, Rest }
 type InputRow = [
     { width: InputWidth, input: Input }
 ]
-type Form = {
+type InputForm = {
     title: string,
     inputrows: InputRow[],
-    actions: Actions[];
-
+    actions: Actions[]
 }
- 
-
-
-/**
- * Boolean condition to check if this path of the workflow proceeds or terminates.
- * Called to check if the next node is to be created.
- * @param wfData current workflow data.
- * @returns <code>false</code> to end this workflow path.
- */
-type Predicate = ( DBlock ) => boolean ;
-const PredicateTrue: Predicate = ( wfData: DBlock ) => true ;
- 
-type NewNode = () => Node ;
-type PredicatePath = [ Predicate, NewNode ] ; // string node-type 
- 
-type Path = {
-
-}
-type FlowDefn = {
-    fields: Field[],
-    flows: Flows[]
-}
-
-type FlowType = {
-    wfType: WfType,
-    wfInstanceId: DInstanceId,
-    wfStartAt: number,
-    wfEndedAt: number,
-    wfNodes: DInstanceId[],
-    wfActiveNodes: DInstanceId[],
-    wfData: DBlock,
-    pndJoinKey: NdJoinKey,
-    pndInstanceId: DInstanceId,
-} ;
 
 
 
