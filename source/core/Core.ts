@@ -36,18 +36,18 @@ type BaseNd = {
     wfType: WfType,
     wfInstanceId: WfInstanceId,
     ndCreatedAt: DateTime,
-    ndCompletedAt: DateTime,
+    ndClosedAt: DateTime,
     ndActions: {
-        [index: NodeAction]: NdType
+        [index: NodeAction]: NdType[]
     },
     ndFlows: WfType[],
 } ;
 
-function FetchNd( ndType: ndType, ndInstanceId: ndInstanceId ) : BaseNd {
+function FetchNd( ndType: ndType, ndInstanceId: ndInstanceId ) : BaseNode {
     // TODO
     return null ;
 }
-function SaveNd( baseNd: BaseNd ) : void {
+function SaveNd( ndObject: { baseNd: BaseNd } ) : void {
     // TODO
 }
 
@@ -63,12 +63,14 @@ type BaseInputNd = {
 type BaseWf = {
     wfType: WfType,
     wfInstanceId: WfInstanceId,
-    wfStartAt: DateTime,
-    wfEndedAt: DateTime,
-    wfData: DBlock,
+    wfCreatedAt: DateTime,
+    wfClosedAt: DateTime,
+    wfData: DataBlock,
+    pwfType: WfType,
+    pwfInstanceId: WfInstanceId,
 } ;
 
-function FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseWf {
+function FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseFlow {
     // TODO
     return null ;
 }
@@ -154,7 +156,7 @@ abstract class BaseNode {
         wfType: WfType,
         wfInstanceId: WfInstanceId,
         ndCreatedAt: Date.now(),
-        ndCompletedAt: 0,
+        ndClosedAt: 0,
         ndActions: {},
         ndFlows: [],
     } ;
@@ -181,33 +183,40 @@ abstract class BaseNode {
         return [] ; 
     }
 
-    protected submitValidate( wfData: DBlock ) : Message[] {
+    protected submitDataValidate( ndData: DataBlock ) : Message[] {
         return [] ; // default - no validation required / pass through
     }
+
+    protected submitDataMerge( ndData: DataBlock, wfData: DataBlock ) : void {
+        // default
+    }
+
+    abstract protected submitNextNodeTypes( ndData: DataBlock ) : NdType[] ;
 
     /**
      * 
      * @param wfData current workflow data.
      * @throws array of validation exceptions.
      */
-    Submit( newWfData: DataBlock ) : void {
-        const messages: Message[] = this.submitValidate( newWfData ) ;
+    Submit( ndData: DataBlock ) : void {
+        const messages: Message[] = this.submitDataValidate( ndData ) ;
         if ( messages.length > 0 ) throw messages ;
         // create next node[s]
-        const wfType: WfType = SaveWf( wfData ) ;
-        const nextNode: NodeAction = this.nodeAction( newWfData ) ;
-        if ( !nextNode ) {
-            this.baseNd.ndEndedAt = Date.now() ;
-            this.save() ;
+        this.baseNd.ndClosedAt = Date.now() ;
+        const baseFlow: BaseFlow = FetchWf( this.baseNd.wfType, this.baseNd.wfInstanceId ) ;
+        this.submitDataMerge( ndData, baseFlow.baseWf.wfData ) ;
+        const nextNdTypes: NdType[] = this.submitNextNodeTypes( ndData ) ;
+        for ( const ndType of nextNdTypes ) {
+            baseFlow.createNode( ndType ).save() ; 
         }
-        const newNode: BaseNd = wfType.newNode( nextNode ) ;
-        if ( result ) {
-            this.ndEndedAt = Date.now() ;
-        }
-        return result ;
+        this.save() ;
+        if ( nextNdTypes.length == 0 ) baseWf.close() ;
+        baseFlow.save() ;
     }
 
-    abstract protected CreateNext( wfData: DBlock ) : boolean ;
+    save() : void {
+        SaveNd( this.toJSON ) ;
+    }
 
     toJSON() : { baseNd: BaseNd } {
         return { baseNd: this.baseNd } ;
@@ -289,69 +298,64 @@ abstract class BaseInputNode extends BaseNode {
 }
 
 
-abstract class Flow {
+abstract class BaseFlow {
 
-    protected defn ;
-
-    protected flow: FlowType = {
+    protected baseWf: BaseWf = {
         wfType = null,
         wfInstanceId = null,
-        wfStartAt = Date.now(),
-        wfEndedAt = 0,
-        wfNodes = [],
-        wfActiveNodes = [],
+        wfCreatedAt = Date.now(),
+        wfClosedAt = 0,
         wfData = null,
-        pndJoinKey = null,
-        pndInstanceId = null,
+        pwfType = null,
+        pwfInstanceId = null,
     } ;
 
-    constructor() {
+    constructor( startData: DataBlock ) {
         super() ;
-        this.flow.wfType = this.constructor.name ;
-        this.flow.wfInstanceId = NewInstanceId() ;
+        const messages: Message[] = this.execPredicate( startData ) ;
+        if ( messages.length > 0 ) throw messages ;
+        // all ok, construct workflow
+        this.baseWf.wfType = this.constructor.name ;
+        this.baseWf.wfInstanceId = NewInstanceId() ;
+        this.init( startData ) ;
     }
 
-    constructor( serialized: { flow: FlowType } ) {
+    constructor( serialized: { baseWf: BaseWf } ) {
         super() ;
-        this.flow = serialized.flow ;
+        this.baseWf = serialized.baseWf ;
     }
 
-    End() : void {
-        this.wfEnded = Date.now() ;
+    // default pass through predicate, else over ride
+    execPredicate( startData: DataBlock ) : Message[] {
+        return [] ; 
     }
 
-    AddNode( ndInstanceId: DInstanceId ) {
-        this.wfNodes.push( ndInstanceId ) ;
-        this.wfActiveNodes.push( ndInstanceId ) ;
+    abstract init( startData: DataBlock ) : void ;
+
+    abstract createNode( ndType: NdType ) : BaseNode ;
+
+    abstract updateFromSubFlow( swfData: DataBlock ) ;
+
+    close() {
+        this.baseWf.wfClosedAt = Date.now() ;
+        if ( this.baseWf.pwfType ) {
+            const pbaseFlow: BaseFlow = FetchWf( this.baseWf.pwfType, this.baseWf.pwfInstanceId ) ;
+            pbaseFlow.updateFromSubFlow( this.baseWf.wfData ) ;
+            pbaseFlow.save() ;
+        }
     }
 
-    SetNonActive( ndInstanceId: DInstanceId ) : void {
-        this.wfActiveNodes = this.wfActiveNodes.filter( id => ndInstanceId != id ) ;
+    save() : void {
+        SaveWf( this.toJSON() ) ;
     }
 
-    toJSON() : object {
-        return { flow: this.flow } ;
+    toJSON() : { baseWf: BaseWf } {
+        return { baseWf: this.baseWf } ;
     }
 
-    public toString() : string {
+    toString() : string {
         return JSON.stringify( toJSON(), null, 2 ) ;
     }
-
-    static Serialize( flow: FlowType ) : boolean {
-
-    }
-
-    static DeSerialize( wfInstanceId: DInstanceId ) : FlowType  {
-        return null ;
-    }
-
-}
-
-function wfSerialize( wfObject: object ) {
-
-}
-
-function wfDeserialize( wfInstanceId: DInstanceId ) : AbstractWorkflow {
 
 }
 
