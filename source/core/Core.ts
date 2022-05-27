@@ -183,15 +183,15 @@ abstract class BaseNode {
         return [] ; 
     }
 
-    protected submitDataValidate( ndData: DataBlock ) : Message[] {
+    protected validateSubmission( ndData: DataBlock ) : Message[] {
         return [] ; // default - no validation required / pass through
     }
 
-    protected submitDataMerge( ndData: DataBlock, wfData: DataBlock ) : void {
+    protected mergeData( ndData: DataBlock, wfData: DataBlock ) : void {
         // default
     }
 
-    abstract protected submitNextNodeTypes( ndData: DataBlock ) : NdType[] ;
+    abstract protected nextNodeTypes( ndData: DataBlock ) : NdType[] ;
 
     /**
      * 
@@ -199,13 +199,13 @@ abstract class BaseNode {
      * @throws array of validation exceptions.
      */
     Submit( ndData: DataBlock ) : void {
-        const messages: Message[] = this.submitDataValidate( ndData ) ;
+        const messages: Message[] = this.validateSubmission( ndData ) ;
         if ( messages.length > 0 ) throw messages ;
         // create next node[s]
         this.baseNd.ndClosedAt = Date.now() ;
         const baseFlow: BaseFlow = FetchWf( this.baseNd.wfType, this.baseNd.wfInstanceId ) ;
-        this.submitDataMerge( ndData, baseFlow.baseWf.wfData ) ;
-        const nextNdTypes: NdType[] = this.submitNextNodeTypes( ndData ) ;
+        this.mergeData( ndData, baseFlow.baseWf.wfData ) ; // todo
+        const nextNdTypes: NdType[] = this.nextNodeTypes( ndData ) ;
         for ( const ndType of nextNdTypes ) {
             baseFlow.createNode( ndType ).save() ; 
         }
