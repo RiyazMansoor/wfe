@@ -11,8 +11,8 @@ type DataBlock = {
 } ;
 // type FormData = DataBlock ;
 
-type WfType = string ;
-type WfInstanceId = string ;
+type flType = string ;
+type flInstanceId = string ;
 type NdType = string ;
 type NdInstanceId = string ;
 
@@ -25,22 +25,22 @@ type Message = {
 type BaseNd = {
     ndType: NdType,
     ndInstanceId: NdInstanceId,
-    wfType: WfType,
-    wfInstanceId: WfInstanceId,
+    flType: flType,
+    flInstanceId: flInstanceId,
     ndCreatedAt: DateTime,
     ndClosedAt: DateTime,
-    ndDefAction:  NdType,
-    ndFlows: WfType[],
+    nextNdType:  NdType,
+    sflTypes: flType[],
 } ;
 
-type BaseWf = {
-    wfType: WfType,
-    wfInstanceId: WfInstanceId,
-    wfCreatedAt: DateTime,
-    wfClosedAt: DateTime,
-    wfData: DataBlock,
-    pwfType: WfType,
-    pwfInstanceId: WfInstanceId,
+type BaseFl = {
+    flType: flType,
+    flInstanceId: flInstanceId,
+    flCreatedAt: DateTime,
+    flClosedAt: DateTime,
+    flData: DataBlock,
+    pflType: flType,
+    pflInstanceId: flInstanceId,
 } ;
 
 
@@ -49,26 +49,26 @@ abstract class BaseNode {
     protected baseNd: BaseNd = {
         ndType: null,
         ndInstanceId: null,
-        wfType: WfType,
-        wfInstanceId: WfInstanceId,
+        flType: flType,
+        flInstanceId: flInstanceId,
         ndCreatedAt: Date.now(),
         ndClosedAt: 0,
-        ndDefAction: null,
-        ndFlows: [],
+        nextNdType: null,
+        sflTypes: [],
     } ;
 
     // does not save this Nd
-    constructor( baseWf: BaseWf, defAction: NdType, flows: WfType[] = [] ) {
+    constructor( baseFl: BaseFl, nextNdType: NdType, flTypes: flType[] = [] ) {
         super() ;
-        const messages: Message[] = this.execPredicate( baseWf.wfData ) ;
+        const messages: Message[] = this.execPredicate( baseFl.flData ) ;
         if ( messages.length > 0 ) throw messages ;
         // all good - construct this node
-        this.baseNd.NdType = this.constructor.name ;
-        this.baseNd.NdInstanceId = NewInstanceId() ;
-        this.baseNd.wfType = baseWf.wfType ;
-        this.baseNd.wfInstanceId = baseWf.wfInstanceId ;
-        this.baseNd.ndDefAction = defAction ;
-        this.baseNd.ndFlows = flows ;
+        this.baseNd.ndType = this.constructor.name ;
+        this.baseNd.ndInstanceId = NewInstanceId() ;
+        this.baseNd.flType = baseFl.flType ;
+        this.baseNd.flInstanceId = baseFl.flInstanceId ;
+        this.baseNd.nextNdType = nextNdType ;
+        this.baseNd.sflTypes = flTypes ;
     }
 
     constructor( serialized: { baseNd: BaseNd } ) {
@@ -77,38 +77,34 @@ abstract class BaseNode {
     }
 
     // default pass through predicate, else over ride
-    protected execPredicate( wfData: DataBlock ) : Message[] {
+    protected execPredicate( flData: DataBlock ) : Message[] {
         return [] ; 
     }
 
-    // default - no validation required / pass through
-    protected validateSubmission( ndData: DataBlock ) : Message[] {
-        return [] ; 
-    }
+    // default - no validation required / pass through - or throw Message[]
+    abstract protected assertDataValid( ndData: DataBlock ) : void ;
 
-    abstract protected nextNodeType( ndData: DataBlock ) : NdType ;
+    // this method must be over-ridden in Input Nodes 
+    protected nextNdType( ndData: DataBlock ) : NdType {
+        return this.baseNd.nextNdType ;
+    }
 
     Submit( ndData: DataBlock ) : void {
-        const messages: Message[] = this.validateSubmission( ndData ) ;
-        if ( messages.length > 0 ) throw messages ;
-        // create next node[s]
-        const baseFlow: BaseFlow = FetchWf( this.baseNd.wfType, this.baseNd.wfInstanceId ) ;
-        baseFlow.mergeData( ndData, this.baseNd ) ;
-        const baseWf: BaseWf =  baseFlow.toJSON().baseWf ;
-        const nextNdType: NdType = this.nextNodeType( ndData ) ;
-        if ( nextNdType ) {
-            baseFlow.createNode( ndType ).save() ;
-            for ( const wfType of this.baseNd.ndFlows ) {
-                CreateWorkflow( wfType, baseWf.wfData, baseWf ) ;
-            } 
-        } else {
-            for ( const wfType of this.baseNd.ndFlows ) {
-                CreateWorkflow( wfType, baseWf.wfData ) ;                
-            } 
-            baseFlow.close() ;
-        }
+        this.assertDataValid( ndData ) ;
         this.baseNd.ndClosedAt = Date.now() ;
         this.save() ;
+        // create next node[s]
+        const baseFlow: BaseFlow = FetchWf( this.baseNd.flType, this.baseNd.flInstanceId ) ;
+        baseFlow.mergeData( ndData, this.baseNd ) ;
+        const wfEnded: boolean = ( this.baseNd.nextNdType == null ) ;
+        for ( const flType of this.baseNd.ndFlows ) {
+            baseFlow.createFlow( flType, !wfEnded ) ;
+        } 
+        if ( nextNdType ) {
+            baseFlow.createNode( this.nextNdType( ndData ) ).save() ;
+        } else {
+            baseFlow.close() ;
+        }
         baseFlow.save() ;
     }
 
@@ -128,33 +124,33 @@ abstract class BaseNode {
 
 abstract class BaseFlow {
 
-    protected baseWf: BaseWf = {
-        wfType = null,
-        wfInstanceId = null,
-        wfCreatedAt = Date.now(),
-        wfClosedAt = 0,
-        wfData = null,
-        pwfType = null,
-        pwfInstanceId = null,
+    protected baseFl: BaseFl = {
+        flType = null,
+        flInstanceId = null,
+        flCreatedAt = Date.now(),
+        flClosedAt = 0,
+        flData = null,
+        pflType = null,
+        pflInstanceId = null,
     } ;
 
-    constructor( startData: DataBlock, pwfBaseWf: BaseWf = null ) {
+    constructor( startData: DataBlock, parentBaseFl: BaseFl = null ) {
         super() ;
         const messages: Message[] = this.execPredicate( startData ) ;
         if ( messages.length > 0 ) throw messages ;
         // all ok, construct workflow
-        this.baseWf.wfType = this.constructor.name ;
-        this.baseWf.wfInstanceId = NewInstanceId() ;
-        if ( pwfBaseWf ) {
-            this.baseWf.pwfType = pwfBaseWf.pwfType ;
-            this.baseWf.pwfInstanceId = pwfBaseWf.pwfInstanceId ;
+        this.baseFl.flType = this.constructor.name ;
+        this.baseFl.flInstanceId = NewInstanceId() ;
+        if ( pflBaseFl ) {
+            this.baseFl.pflType = parentBaseFl.pflType ;
+            this.baseFl.pflInstanceId = parentBaseFl.pflInstanceId ;
         }
-        this.init( startData ) ;
+        this.mergeData( startData, null ) ;
     }
 
-    constructor( serialized: { baseWf: BaseWf } ) {
+    constructor( serialized: { baseFl: BaseFl } ) {
         super() ;
-        this.baseWf = serialized.baseWf ;
+        this.baseFl = serialized.baseFl ;
     }
 
     // default pass through predicate, else over ride
@@ -162,22 +158,22 @@ abstract class BaseFlow {
         return [] ; 
     }
 
-    abstract init( startData: DataBlock ) : void ;
-
     // default - no data merge is required
     abstract mergeData( ndData: DataBlock, baseNd: BaseNd ) : void ;
 
     abstract createNode( ndType: NdType ) : BaseNode ;
 
-    updateFromSubFlow( baseWf: BaseWf ) : void {
+    abstract createFlow( flType: flType, isSubFlow: boolean = true ) : void ;
+
+    backFlow( childBaseFl: BaseFl ) : void {
         // default - no sub flows to handle.
     }
 
     close() {
-        this.baseWf.wfClosedAt = Date.now() ;
-        if ( this.baseWf.pwfType ) {
-            const pbaseFlow: BaseFlow = FetchWf( this.baseWf.pwfType, this.baseWf.pwfInstanceId ) ;
-            pbaseFlow.updateFromSubFlow( this.baseWf ) ;
+        this.baseFl.flClosedAt = Date.now() ;
+        if ( this.baseFl.pflType ) {
+            const pbaseFlow: BaseFlow = FetchWf( this.baseFl.pflType, this.baseFl.pflInstanceId ) ;
+            pbaseFlow.backFlow( this.baseFl ) ;
             pbaseFlow.save() ;
         }
     }
@@ -186,8 +182,8 @@ abstract class BaseFlow {
         SaveWf( this.toJSON() ) ;
     }
 
-    toJSON() : { baseWf: BaseWf } {
-        return { baseWf: this.baseWf } ;
+    toJSON() : { baseFl: BaseFl } {
+        return { baseFl: this.baseFl } ;
     }
 
     toString() : string {
@@ -209,13 +205,13 @@ abstract class BaseFlow {
 
 
 type EfaasUsername = string ;
-type StaffRole = string ;
+type AuthRole = string ;
 type HoursSLA = number ; 
 
 type BaseInputNd = {
     ndHoursSLA: HoursSLA,
     ndDeadlineSLA: DateTime,
-    ndStaffRole: StaffRole,
+    ndAuthRole: AuthRole,
     ndStaffUser: EfaasUsername,
     ndStatus: NodeStatus,
     ndEditData: Key[],
@@ -252,73 +248,65 @@ abstract class BaseInputNode extends BaseNode {
     protected baseInputNd: BaseInputNd = {
         ndHoursSLA: null,
         ndDeadlineSLA: null,
-        ndStaffRole: null,
+        ndAuthRole: null,
         ndStaffUser: null,
         ndStatus: NodeStatus.Ready,
-        ndEditData: [],
+        // ndEditData: [],
     }
 
-    constructor( hoursSLA: HoursSLA, staffRole: StaffRole ) {
-        super() ;
+    constructor( baseFl: BaseFl, nextNdType: NdType, flTypes: flType[] = [], hoursSLA: HoursSLA, authRole: AuthRole ) {
+        super( baseFl, nextNdType, flTypes ) ;
         this.baseInputNd.ndHoursSLA = hoursSLA ;
         this.baseInputNd.ndDeadlineSLA = AddWorkingHours( hoursSLA ) ;
-        this.baseInputNd.ndStaffRole = staffRole ;
+        this.baseInputNd.ndAuthRole = authRole ;
     }
 
     constructor( serialized: { baseInputNd: BaseInputNd } ) {
-        super() ;
+        super( serialized ) ;
         this.baseInputNd = serialized.baseInputNd ;
     }
 
-    protected AssertIsAuthorised( user: EfaasUsername ) : void {
-        if ( !StaffInRole( user, this.baseInputNd.ndStaffRole ) ) {
-            throw `Node type=${this.baseNd.ndType} instance=${this.baseNd.ndInstanceId} :: Staff=${user} NOT in authorized role=${this.baseInputNd.ndStaffRole}` ;
+    protected assertIsAuthorised( staff: EfaasUsername ) : void {
+        if ( !StaffInAuthRole( staff, this.baseInputNd.ndAuthRole ) ) {
+            throw `Node type=${this.baseNd.ndType} instance=${this.baseNd.ndInstanceId} :: Staff=${staff} NOT in authorized role=${this.baseInputNd.ndAuthRole}` ;
         }
     }
     
-    protected AssertCorrectStatus( expectedStatus: InputNodeStatus ) : void {
+    protected assertCorrectStatus( expectedStatus: InputNodeStatus ) : void {
         if ( this.baseInputNd.ndStatus != expectedStatus ) {
             throw `Node type=${this.baseNd.ndType} instance=${this.baseNd.ndInstanceId} :: status=(expected=${expectedStatus}, actual=${this.baseInputNd.ndStatus}).` ;
         }
     }
 
-    protected AssertSameUser( user: EfaasUsername ) : void {
-        if ( this.baseInputNd.ndStaffUser != user ) {
-            throw `Node type=${this.baseNd.ndType} instance=${this.baseNd.ndInstanceId} :: staff=(expected=${this.baseInputNd.ndStaffUser}, actual=${user}).` ;
+    protected assertSameUser( staff: EfaasUsername ) : void {
+        if ( this.baseInputNd.ndStaffUser != staff ) {
+            throw `Node type=${this.baseNd.ndType} instance=${this.baseNd.ndInstanceId} :: staff=(expected=${this.baseInputNd.ndStaffUser}, actual=${staff}).` ;
         }
     }
 
-    public Start( user: EfaasUsername ) : void {
-        this.AssertIsAuthorised( user ) ;
-        this.AssertCorrectStatus( InputNodeStatus.Ready ) ;
+    Start( staff: EfaasUsername ) : void {
+        this.assertIsAuthorised( staff ) ;
+        this.assertCorrectStatus( InputNodeStatus.Ready ) ;
         this.baseInputNd.ndStatus = InputNodeStatus.Started ;
-        this.baseInputNd.ndStaffUser = user ;
+        this.baseInputNd.ndStaffUser = staff ;
         this.save() ;
     }
 
-    public Return( user: EfaasUsername ) : void {
-        this.AssertIsAuthorised( user ) ;
-        this.AssertSameUser( user ) ;
-        this.AssertCorrectStatus( InputNodeStatus.Started ) ;
+    Return( staff: EfaasUsername ) : void {
+        this.assertIsAuthorised( staff ) ;
+        this.assertSameUser( staff ) ;
+        this.assertCorrectStatus( InputNodeStatus.Started ) ;
         this.baseInputNd.ndStatus = null ;
         this.baseInputNd.ndStatus = InputNodeStatus.Ready ;
         this.save() ;
     }
 
 
-    /**
-     * 
-     * @param wfData current workflow data.
-     * @throws array of validation exceptions.
-     */
-    public Submit( wfData: DBlock, user: string ) : void {
-        if ( this.ndUser != user ) {
-            throw `Node type=${this.ndName} instance=${this.ndInstanceId} staff=${this.ndUser} already working.` ;
-        }
-        this.Validate( wfData ) ; // can throw validation exceptions
-        // create next nodes.
-        this.ndEndedAt = Date.now() ;
-        this.ndStatus = NodeStatus.ENDED ;
+    Submit( ndData: DataBlock, staff: EfaasUsername ) : void {
+        this.assertIsAuthorised( staff ) ;
+        this.assertSameUser( staff ) ;
+        this.assertCorrectStatus( InputNodeStatus.Started ) ;
+        super.Submit( ndData ) ;
     }
 
 
@@ -335,61 +323,15 @@ abstract class BaseInputNode extends BaseNode {
 
 
 
-abstract class IfNode extends Node {
-
-    protected routes: PredicatePath[] = [] ;
-
-    constructor() {
-        super() ;
-    }
-
-    protected CreateNext( wfData: DBlock ) : boolean {
-        let result: boolean = false ;
-        for ( const pp of routes ) {
-            if ( pp( wfData ) ) {
-                // create node ; 
-                // create new workflow ;
-                result = true ;
-                break ;
-            }
-        }
-        return result ;
-    }
-
-}
-
-abstract class BranchOutNode extends Node {
-
-    protected routes: PredicatePath[] = [] ;
-
-    constructor() {
-        super() ;
-    }
-
-    protected CreateNext( wfData: DBlock ) : boolean {
-        let result: boolean = false ;
-        for ( const pp of routes ) {
-            if ( pp( wfData ) ) {
-                // create node ; 
-                // create new workflow ;
-                result = true ;
-            }
-        }
-        return result ;
-    }
-
-}
-
-
 // static functions
 
 // TODO
-function CreateWorkflow( wfType: WfType, wfStartData: DataBlock, parentBaseWf: BaseWf = null ) : BaseFlow {
-    switch ( wfType ) {
+function CreateWorkflow( flType: flType, wfStartData: DataBlock, parentBaseFl: BaseFl = null ) : BaseFlow {
+    switch ( flType ) {
         case "DocumentVerficationWorkflow": 
-            return new DocumentVerificationWorkflow( wfStartData, parentBaseWf ) ; 
+            return new DocumentVerificationWorkflow( wfStartData, parentBaseFl ) ; 
     }
-    throw `function CreateWorkflow :: unknown wfClass "${wfType}` ;
+    throw `function CreateWorkflow :: unknown wfClass "${flType}` ;
 }
 
 // TODO
@@ -403,12 +345,12 @@ function SaveNd( ndObject: { baseNd: BaseNd } ) : void {
 }
 
 // TODO
-function FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseFlow {
+function FetchWf( flType: flType, flInstanceId: flInstanceId ) : BaseFlow {
     return null ;
 }
 
 // TODO
-function SaveWf( baseWf: BaseWf ) : void {
+function SaveWf( baseFl: BaseFl ) : void {
 
 }
 
@@ -418,7 +360,7 @@ function AddWorkingHours( hoursSLA: HoursSLA ) : DateTime {
 }
 
 // TODO
-function StaffInRole( user: EfaasUsername, staffRole: StaffRole ) : boolean {
+function StaffInAuthRole( staff: EfaasUsername, authRole: AuthRole ) : boolean {
     return true ;
 }
 
