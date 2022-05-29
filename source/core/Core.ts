@@ -217,29 +217,7 @@ type BaseInputNd = {
     ndEditData: Key[],
 }
 
-enum InputNodeAction { Submit, Review, Reject, Approve, UserResubmit } ;
 enum InputNodeStatus { Waiting, Ready, Started, Ended }
-
-enum Validation { Required, StringLength }
-type Input = {
-    key: string,
-    value: DataType,
-    default: DataType,
-    label: string,
-    tip: Html,
-    required: boolean,
-    validations: Validation[],
-}
-
-enum InputWidth { Quarter, Half, ThreeQuarter, Third, TwoThird, Rest }
-type InputRow = [
-    { width: InputWidth, input: Input }
-]
-type InputForm = {
-    title: string,
-    inputrows: InputRow[],
-    actions: Actions[]
-}
 
 
 
@@ -313,6 +291,51 @@ abstract class BaseInputNode extends BaseNode {
     toJSON() : { inputBaseNd: InputBaseNd } {
         const obj = super.toJSON() ;
         obj.baseInputNd = this.baseInputNd ;
+        return obj ;
+    }
+
+}
+
+enum InputNodeAction { Submit, Review, Reject, Approve, UserResubmit } ;
+enum Validation { Required, StringLength }
+type Input = {
+    key: string,
+    value: DataType,
+    default: DataType,
+    label: string,
+    tip: Html,
+    required: boolean,
+    validations: Validation[],
+}
+
+enum InputWidth { Quarter, Half, ThreeQuarter, Third, TwoThird, Rest }
+type InputRow = [
+    { width: InputWidth, input: Input }
+]
+type InputForm = {
+    title: string,
+    inputrows: InputRow[],
+    actions: Actions[]
+}
+
+abstract class BaseFormInputNode extends BaseInputNode {
+
+    protected baseFormInputNd: BaseFormInputNd = {
+        // ndEditData: [],
+    }
+
+    constructor( baseFl: BaseFl, nextNdType: NdType, flTypes: flType[] = [], hoursSLA: HoursSLA, authRole: AuthRole ) {
+        super( baseFl, nextNdType, flTypes, hoursSla, authRole ) ;
+    }
+
+    constructor( serialized: { baseFormInputNd: BaseFormInputNd } ) {
+        super( serialized ) ;
+        this.baseFormInputNd = serialized.baseFormInputNd ;
+    }
+
+    toJSON() : { baseFormInputNd: BaseFormInputNd } {
+        const obj = super.toJSON() ;
+        obj.baseFormInputNd = this.baseFormInputNd ;
         return obj ;
     }
 
