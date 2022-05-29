@@ -1,6 +1,4 @@
 
-import { NewInstanceId } from "./Utils" ;
-
 
 type Email = string ;
 type DateTime = number ;
@@ -21,10 +19,8 @@ type NdInstanceId = string ;
 type Message = {
     type: "I"|"A"|"E",
     key: Key,
-    message: string
+    message: Html
 }
-
-enum NodeAction { Submit, Review, Reject, Approve, UserResubmit } ;
 
 type BaseNd = {
     ndType: NdType,
@@ -33,19 +29,9 @@ type BaseNd = {
     wfInstanceId: WfInstanceId,
     ndCreatedAt: DateTime,
     ndClosedAt: DateTime,
-    ndActions: {
-        [index: NodeAction]: NdType
-    },
+    ndDefAction:  NdType,
     ndFlows: WfType[],
 } ;
-
-function FetchNd( ndType: ndType, ndInstanceId: ndInstanceId ) : BaseNode {
-    // TODO
-    return null ;
-}
-function SaveNd( ndObject: { baseNd: BaseNd } ) : void {
-    // TODO
-}
 
 type BaseWf = {
     wfType: WfType,
@@ -57,13 +43,6 @@ type BaseWf = {
     pwfInstanceId: WfInstanceId,
 } ;
 
-function FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseFlow {
-    // TODO
-    return null ;
-}
-function SaveWf( baseWf: BaseWf ) : void {
-    // TODO
-}
 
 abstract class BaseNode {
 
@@ -74,12 +53,12 @@ abstract class BaseNode {
         wfInstanceId: WfInstanceId,
         ndCreatedAt: Date.now(),
         ndClosedAt: 0,
-        ndActions: {},
+        ndDefAction: null,
         ndFlows: [],
     } ;
 
     // does not save this Nd
-    constructor( baseWf: BaseWf ) {
+    constructor( baseWf: BaseWf, defAction: NdType, flows: WfType[] = [] ) {
         super() ;
         const messages: Message[] = this.execPredicate( baseWf.wfData ) ;
         if ( messages.length > 0 ) throw messages ;
@@ -88,6 +67,8 @@ abstract class BaseNode {
         this.baseNd.NdInstanceId = NewInstanceId() ;
         this.baseNd.wfType = baseWf.wfType ;
         this.baseNd.wfInstanceId = baseWf.wfInstanceId ;
+        this.baseNd.ndDefAction = defAction ;
+        this.baseNd.ndFlows = flows ;
     }
 
     constructor( serialized: { baseNd: BaseNd } ) {
@@ -240,6 +221,7 @@ type BaseInputNd = {
     ndEditData: Key[],
 }
 
+enum InputNodeAction { Submit, Review, Reject, Approve, UserResubmit } ;
 enum InputNodeStatus { Waiting, Ready, Started, Ended }
 
 enum Validation { Required, StringLength }
@@ -264,8 +246,6 @@ type InputForm = {
 }
 
 
-// AddWorkingHours( hoursSLA )
-// StaffInRole( user, this.baseInputNd.ndStaffRole )
 
 abstract class BaseInputNode extends BaseNode {
 
@@ -403,6 +383,7 @@ abstract class BranchOutNode extends Node {
 
 // static functions
 
+// TODO
 function CreateWorkflow( wfType: WfType, wfStartData: DataBlock, parentBaseWf: BaseWf = null ) : BaseFlow {
     switch ( wfType ) {
         case "DocumentVerficationWorkflow": 
@@ -411,5 +392,42 @@ function CreateWorkflow( wfType: WfType, wfStartData: DataBlock, parentBaseWf: B
     throw `function CreateWorkflow :: unknown wfClass "${wfType}` ;
 }
 
+// TODO
+function FetchNd( ndType: ndType, ndInstanceId: ndInstanceId ) : BaseNode {
+    return null ;
+}
+
+// TODO
+function SaveNd( ndObject: { baseNd: BaseNd } ) : void {
+
+}
+
+// TODO
+function FetchWf( wfType: WfType, wfInstanceId: WfInstanceId ) : BaseFlow {
+    return null ;
+}
+
+// TODO
+function SaveWf( baseWf: BaseWf ) : void {
+
+}
+
+// TODO
+function AddWorkingHours( hoursSLA: HoursSLA ) : DateTime {
+    return Date.now() + 1000 * 60 * 5 ;
+}
+
+// TODO
+function StaffInRole( user: EfaasUsername, staffRole: StaffRole ) : boolean {
+    return true ;
+}
+
+function NewInstanceId( len: number = 30 ) : string {
+    let id: string = new Date().toISOString().replace( /\D/g, "" ) + "_" ;
+    while ( id.length < len ) {
+        id += Math.random().toString( 36 ).substring( 2 ) ; 
+    }
+    return id.substring( 0, len ) ;
+}
 
 
