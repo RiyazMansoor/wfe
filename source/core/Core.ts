@@ -341,6 +341,49 @@ abstract class BaseFormInputNode extends BaseInputNode {
 
 }
 
+type CheckKey = string ;
+type Checks = {
+    [index: CheckKey]: string
+} ;
+
+const ChecklistItem = `
+<p>
+  <input class="w3-check" type="checkbox" id="$CheckKey" name="$CheckKey">
+  <label for="$CheckKey">$CheckDetail</label>
+</p>
+` ;
+
+abstract class BaseChecklistInputNode extends BaseInputNode {
+
+    protected baseChecklistInputNd: BaseChecklistInputNd = {
+        ndChecklistChecks: null 
+    }
+
+    constructor( baseFl: BaseFl, nextNdType: NdType, flTypes: flType[] = [], hoursSLA: HoursSLA, authRole: AuthRole, checklistChecks: DockChecks ) {
+        super( baseFl, nextNdType, flTypes, hoursSla, authRole ) ;
+        this.baseChecklistInputNd.ndChecklistChecks = checklistChecks ;
+    }
+
+    constructor( serialized: { baseChecklistInputNd: BaseChecklistInputNd } ) {
+        super( serialized ) ;
+        this.baseChecklistInputNd = serialized.baseFormInputNd ;
+    }
+
+    html() : HTML {
+        let fields: string = "" ;
+        for ( const [ key, value ] of Object.entries( this.baseChecklistInputNd.ndChecklistChecks ) ) {
+            fields += ChecklistItem.replace( /$CheckKey/g, key ).replace( "$CheckDetail", value ) ;
+        }
+        return fields ;
+    }
+
+    toJSON() : { baseChecklistInputNd: BaseChecklistInputNd } {
+        const obj = super.toJSON() ;
+        obj.baseChecklistInputNd = this.baseChecklistInputNd ;
+        return obj ;
+    }
+
+}
 
 
 
