@@ -1,11 +1,37 @@
 
-const HTML_Checklist_Item = `
-<div class="w3-cell-row w3-margin w3-padding w3-pale-red" style="width:90%;">
-    <div class="w3-cell w3-cell-middle" style="width:30pt;">
-        <input class="w3-check" type="checkbox" id="$name" name="$name" onchange="CheckToggle(this)">
-    </div>
-    <div class="w3-cell w3-cell-middle" >
-        <label for="$name"><b>I confirm the above document checks have been made by me.</b></label>
-    </div>
-</div>
-` ;
+  function UnFlatten( obj ) {
+    const u = {} ;
+    for ( const [ key, value ] of Object.entries( obj ) ) {
+      const key_parts = key.split( "." ) ;
+      if ( key_parts.length == 1 ) {
+        u[key] = value ;
+      } else {
+        const tmp_u = u ;
+        for ( let i = 0 ; i < key_parts.length-1 ; i++ ) {
+          const k = key_parts[i] ;
+          if ( !tmp_u[k] ) {
+            tmp_u[k] = {} ;
+          }
+          tmp_u = tmp_u[k] ;
+        }
+        tmp_u[key_parts[key_parts.length-1]] = value ;
+      }
+    }
+    return u ;
+  }
+  function Flatten( obj ) {
+    const f = {} ;
+    for ( const [ key, value ] of Object.entries( obj ) ) {
+      if ( $.isPlainObject( value ) ) {
+        const f_values = Flatten( value ) ;
+        for ( const [ fkey, fvalue ] of Object.entries( f_values ) ) {
+          f[key+"."+fkey] = fvalue ;
+        }
+      } else {
+        f[key] = value ;
+      }
+    }
+    return f ;
+  }
+
+
