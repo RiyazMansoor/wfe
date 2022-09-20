@@ -1,58 +1,84 @@
+/**
+ * The fundamental types used in this project.
+ * 
+ * @author riyaz.mansoor@gmail.com
+ * @created 20220920 v0.1
+ */
+
+
+
+/**
+ * Type for integers.
+ */
+export type T_Integer = number;
+
+/**
+* Type for Date - representated as ISO string yyyymmdd.
+*/
+export type T_Date = string;
+
+/**
+* Type for a ate range.
+*/
+export type T_DateRange = {
+    from: T_Date,
+    to: T_Date
+}
 
 /**
  * Type for Datetime timestamp - representated as ISO string with timezone.
  */
-export type T_Timestamp = string ;
+export type T_Timestamp = string;
 
- /**
- * Uinque identifiers for individuals.
- */
-export type T_IndId = string ;
+/**
+* Uinque identifiers for individuals.
+*/
+export type T_IndId = string;
 
 /**
  * Unique identifiers for organizations.
  */
-export type T_OrgId = string ;
+export type T_OrgId = string;
 
 /**
  * Services can be requested on an individual basis or on behalf of an organization.
  */
-export type T_ServiceClientId = T_IndId | T_OrgId ;
+export type T_ServiceClientId = T_IndId | T_OrgId;
 
 /**
  * Unique identifiers for entity kinds.
  */
-export type T_EntityKind = string ;
+export type T_EntityKind = string;
 
 /**
  * Unique identifiers for entities.
  */
-export type T_EntityId = string ;
+export type T_EntityId = string;
 
 /**
  * HTML text.
  */
-export type T_HTML = string ;
+export type T_HTML = string;
 
 /**
  * A url.
  */
-export type T_URL = string ;
+export type T_URL = string;
 
- /**
- * A random string used as an access token.
- */
-export type T_Token = string ;
+/**
+* A random string used as an access token.
+*/
+export type T_Token = string;
 
 /**
  * Authorization roles. By convention role specializations are separated by a dash "-".
  */
-export type T_RoleKey = string ;
+export type T_RoleKey = string;
 
 /**
  * Fundamentally, all data in this sytem will be either string or number.
  */
-export type T_DataType = string | number ;
+export type T_DataType = string | number;
 
 /**
  * A container object for data. 
@@ -60,10 +86,6 @@ export type T_DataType = string | number ;
  */
 export type T_DataObject = {
     [index: string]: T_DataType | T_DataObject
-} 
-
-export enum E_Button {
-    ACCEPT, REJECT
 }
 
 
