@@ -120,6 +120,31 @@ interface API_SingleUseToken {
 }
 
 
+////// Implementations 
+
+export class SingleUseTokenExecutor implements I_TokenDecisionExecuter {
+
+    private static instance: SingleUseTokenExecutor ;
+
+    private constructor() {
+        // empty private constructor for singleton
+    }
+
+    static getInstance() : SingleUseTokenExecutor {
+        if ( !SingleUseTokenExecutor.instance ) {
+            SingleUseTokenExecutor.instance = new SingleUseTokenExecutor() ;
+        }
+        return SingleUseTokenExecutor.instance ;
+    }
+
+    tokenExecute(decisionChoice: E_Decision, dataObject: T_DataObject): void {
+        throw new Error("Method not implemented.");
+    }
+
+}
+
+
+
 export class SingleUsetoken implements I_SingleUseToken {
 
     private static instance: SingleUsetoken ;
