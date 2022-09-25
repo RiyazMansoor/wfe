@@ -6,20 +6,20 @@
  */
 
 
-
+ 
 /**
  * Type for integers.
  */
 export type T_Integer = number;
 
 /**
-* Type for Date - representated as ISO string yyyymmdd.
-*/
+ * Type for Date - representated as ISO string yyyymmdd.
+ */
 export type T_Date = string;
 
 /**
-* Type for a ate range.
-*/
+ * Type for a ate range.
+ */
 export type T_DateRange = {
     from: T_Date,
     to: T_Date
@@ -31,8 +31,8 @@ export type T_DateRange = {
 export type T_Timestamp = string;
 
 /**
-* Uinque identifiers for individuals.
-*/
+ * Uinque identifiers for individuals.
+ */
 export type T_IndId = string;
 
 /**
@@ -46,16 +46,6 @@ export type T_OrgId = string;
 export type T_ServiceClientId = T_IndId | T_OrgId;
 
 /**
- * Unique identifiers for entity kinds.
- */
-export type T_EntityKind = string;
-
-/**
- * Unique identifiers for entities.
- */
-export type T_EntityId = string;
-
-/**
  * HTML text.
  */
 export type T_HTML = string;
@@ -66,14 +56,9 @@ export type T_HTML = string;
 export type T_URL = string;
 
 /**
-* A random string used as an access token.
-*/
-export type T_Token = string;
-
-/**
  * Authorization roles. By convention role specializations are separated by a dash "-".
  */
-export type T_RoleKey = string;
+export type T_RoleId = string;
 
 /**
  * Fundamentally, all data in this sytem will be either string or number.

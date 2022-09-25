@@ -7,80 +7,110 @@
  */
 
 
-import { T_IndId, T_HTML, T_Timestamp, T_Token, T_DataObject } from "./types.h" ;
+
+import { T_IndId, T_HTML, T_Timestamp, T_DataObject } from "./types.h" ;
 import { randomString, timestamp } from "./util.h" ;
+import { MEM_F_Write, MEM_F_Read } from "./store" ;
+
+/**
+* A random string used as an access token.
+*/
+export type T_TokenId = string;
+
+/**
+ * Id to uniquely identify each I_TokenDecisionExecutor
+ */
+export type T_TokenExecutorId = string ;
 
 /**
  * Decisions the user can make based on the context.
  */
-enum E_Decision {
-    ACCEPT, REJECT
+export enum E_TokenAction {
+    ACCEPT = "ACCEPT", REJECT = "ACCEPT"
 }
 
 
 /**
- * The interface that will be executed upon the submission of a valid token.
- * For every different decision the user is presented, a matching class
- * taking into account all possible decisions (decision buttons), must be implemented.
+ * The interface that will be implemented to execute user decisions upon the submission of a valid token.
  */
-interface I_TokenDecisionExecuter {
+export interface I_TokenExecuter {
 
     /**
-     * The method that will be called upon the submission of a valid token.
-     * This method will be implemented within the class @tokenExecuter implementation.
-     * @param decisionChoice The decision (button clicked) by the user.
-     * @param dataObject The pre-prepared data object (during token creation).
+     * This method is used to match a token to its matching I_TokenExecuter implementation.
+     * @returns The unique identifier for this token decision executor.
      */
-    tokenExecute(decisionChoice: E_Decision, dataObject: T_DataObject): void;
+    executorId() : T_TokenExecutorId ;
+
+    /**
+     * This method will be called upon the submission of a valid token, 
+     * on the matching registered I_TokenExecuter implementation.
+     * @param decision The decision (button clicked) by the user.
+     * @param data The pre-prepared data object (during token creation).
+     */
+    execute( decision: E_TokenAction, data: T_DataObject ): void;
 
 }
 
 /**
- * Describes the properties of the T_SingleUseToken required when creation,
- * and the properties when the token is consumed.
- * @token The single use access token.
+ * The interface for a (singleton) global register of all I_TokenDecisionExecuter implementations.
+ * Whenever a user successfully submits a token, the matching executor is fetched and executed. 
+ */
+export interface I_TokenExecuterRegister {
+
+    /**
+     * Registers I_TokenDecisionExecuter implementations to their unique T_TokenExecutorId.
+     * @see getExecutor()
+     * @param tokenExecutor The I_TokenExecuter implementation to register.
+     */
+    registerExecutor( tokenExecutor: I_TokenExecuter ): void ;
+
+    /**
+     * @param executorId The unique T_TokenExecutorId of the I_TokenExecuter to return.
+     * @return The matching I_TokenExecuter implementation.
+     */
+    getExecutor( executorId: T_TokenExecutorId ): I_TokenExecuter ;
+
+}
+
+
+/**
+ * Describes the properties of a single use token T_SingleUseToken.
+ * The token properties required when creation and the properties when the it is consumed.
+ * @tokenId The single use access token.
+ * @exprity The expiry time of this token if no action taken.
  * @createdAt The token creation timestamp.
  * @createdFor The specific individual the token is targetted at.
  * @detail The long explanation of token. Used in the decision form.
- * @dataObject The key parameters needed to process the user decision.
- * @decisionExecutor The code to be executed when a token decision is made by user.
- * @decisionChoices Array of possible decisions user can make.
- * @decision Records the decision made by the user of token
- *      @decidedAt The token consumption timestamp.
- *      @decidedBy The specific individual who consumed the token.
- *      @decisionChoice The decision taken by the individual.
+ * @data The key parameters needed to process the user decision.
+ * @tokenExecutorId The unique id of the executor.
+ * @tokenActions Array of possible token actions user can make.
+ * @consumed Records the decision made by the user of token.
+ *      @at The token consumption timestamp.
+ *      @by The specific individual who consumed the token.
+ *      @userAction The decision taken by the individual.
  */
-type T_SingleUseToken = {
-    token: T_Token,
+type T_Token = {
+    tokenId: T_TokenId,
+    expiry: T_Timestamp,
     createdAt: T_Timestamp,
     createdFor: T_IndId,
     detail: T_HTML,
-    dataObject: T_DataObject,
-    decisionExecutor: I_TokenDecisionExecuter,
-    decisionChoices: E_Decision[],
-    decision: {
-        decidedAt: T_Timestamp,
-        decidedBy: T_IndId,
-        decisionChoice: E_Decision,
+    data: T_DataObject,
+    tokenExecutorId: T_TokenExecutorId,
+    tokenActions: E_TokenAction[],
+    consumed: {
+        at: T_Timestamp,
+        by: T_IndId,
+        userAction: E_TokenAction,
     }
 }
 
 /**
  * The API interface to interact with the system without logging in,
  * using the a one time usable access token.
- * @see T_SingleUseToken
+ * @see T_Token
  */
 interface API_SingleUseToken {
-
-    /**
-     * Returns the matching token data structure.
-     * A consumed token will also return the matching data structure,
-     * it is up to the caller to take appropriate action.
-     * @see submit
-     * @param token The unique single use access token.
-     * @return The matching data structure.
-     */
-    get(token: T_Token): T_SingleUseToken;
 
     /**
      * Accepts a users decision, authenticated via the single use access token.
@@ -88,11 +118,11 @@ interface API_SingleUseToken {
      * and call the @tokenExecute method with @decisionChoice and @dataObject parameters.
      * @note Does NOT enforce @createdFor and @consumedBy to be same.
      * @throws If the token has already been consumed.
-     * @param token The unique single use access token.
-     * @param decisionChoice The decision made by the user (button clicked).
+     * @param tokenId The unique single use access token.
+     * @param userAction The decision made by the user (button clicked).
      * @return true if token was submitted/consumed successfully.
      */
-    submit(token: T_Token, decisionChoice: E_Decision): boolean;
+    submit(tokenId: T_TokenId, userAction: E_TokenAction): boolean;
 
 }
 
@@ -100,101 +130,96 @@ interface API_SingleUseToken {
 /**
  * The interface to create a single use access token.
  * The implementation will be a singleton pattern.
- * @see T_SingleUseToken
+ * @see T_Token
  */
- export interface I_SingleUseToken {
+ export interface I_TokenRegister {
 
     /**
      * Creates and returns a single use access token.
      * By default, if token is not consumed for 3 days, it is blocked.
      * @param createdFor The specific individual the token is targetted at.
-     * @param detail The long explanation of token. Used in the decision form.
-     * @param dataObject The key parameters needed to process the user decision.
-     * @param decisionExecutor The code to be executed when a token decision is made by user.
-     * @param decisionChoices Array of possible decisions user can make.
+     * @param detail The explanation displayed to the user.
+     * @param data The parameters needed to process the user decision.
+     * @param tokenExecutor The code to be executed when a token decision is made by user.
+     * @param tokenActions Array of possible decisions user can make.
      * @returns The created single use access token. 
      */
-    createToken(createdFor: T_IndId, detail: T_HTML, decisionChoices: E_Decision[], 
-        dataObject: T_DataObject, decisionExecutor: I_TokenDecisionExecuter): T_SingleUseToken ;
+    registerToken(createdFor: T_IndId, detail: T_HTML, data: T_DataObject, tokenExecutor: I_TokenExecuter, tokenActions: E_TokenAction[] ): T_TokenId ;
+
+    /**
+     * @param tokenId The unique token id T_TokenId.
+     * @return The matching token T_Token from the register.
+     */
+    getToken(tokenId: T_TokenId): T_Token;
 
 }
 
 
+
 ////// Implementations 
 
-export class SingleUseTokenExecutor implements I_TokenDecisionExecuter {
+export class TokenExecutorRegister implements I_TokenExecuterRegister {
 
-    private static instance: SingleUseTokenExecutor ;
+    private static instance: TokenExecutorRegister ;
+
+    /**
+     * @returns Singleton instance of TokenExecutorRegister.
+     */
+    static getInstance() : TokenExecutorRegister {
+        if (!TokenExecutorRegister.instance) {
+            TokenExecutorRegister.instance = new TokenExecutorRegister() ;
+        }
+        return TokenExecutorRegister.instance ;
+    }
+
+    private executors: Map<T_TokenExecutorId, I_TokenExecuter> = new Map() ;
 
     private constructor() {
         // empty private constructor for singleton
     }
 
-    static getInstance() : SingleUseTokenExecutor {
-        if ( !SingleUseTokenExecutor.instance ) {
-            SingleUseTokenExecutor.instance = new SingleUseTokenExecutor() ;
-        }
-        return SingleUseTokenExecutor.instance ;
+    registerExecutor(tokenExecutor: I_TokenExecuter): void {
+        this.executors.set(tokenExecutor.executorId(), tokenExecutor);
     }
 
-    tokenExecute(decisionChoice: E_Decision, dataObject: T_DataObject): void {
+    getExecutor(executorId: string): I_TokenExecuter {
+        const executor = this.executors.get(executorId);
+        if (!executor) {
+            throw `NO I_TokenExecuter registered for id=${executorId}`;
+        }
+        return executor;
+    }
+
+}
+
+
+
+export class TokenRegister implements I_TokenRegister {
+
+    private static instance: TokenRegister ;
+
+     static getInstance() : TokenRegister {
+        if ( !TokenRegister.instance ) {
+            TokenRegister.instance = new TokenRegister() ;
+        }
+        return TokenRegister.instance ;
+    }
+
+    private constructor() {
+        
+    }
+    registerToken(createdFor: T_IndId, detail: string, data: T_DataObject, tokenExecutor: I_TokenExecuter, tokenActions: E_TokenAction[]): T_TokenId {
         throw new Error("Method not implemented.");
     }
 
-}
-
-
-
-export class SingleUsetoken implements I_SingleUseToken {
-
-    private static instance: SingleUsetoken ;
-
-    private constructor() {}
-
-    static getInstance() : SingleUsetoken {
-        if ( !SingleUsetoken.instance ) {
-            SingleUsetoken.instance = new SingleUsetoken() ;
+    getToken(tokenId: string): T_Token {
+        const token = MEM_F_Read("token", tokenId);
+        if (!token) {
+            throw `NOT found - TokenId=${tokenId}`;
         }
-        return SingleUsetoken.instance ;
+        return token as T_Token;
     }
 
-    createToken(createdFor: T_IndId, detail: string, decisionChoices: E_Decision[], dataObject: T_DataObject, decisionExecutor: I_TokenDecisionExecuter): T_SingleUseToken {
-        const sut: T_SingleUseToken = {
-            token: randomString(),
-            createdAt: timestamp(),
-            createdFor: createdFor,
-            detail: detail,
-            dataObject: dataObject,
-            decisionExecutor: decisionExecutor,
-            decisionChoices: decisionChoices,
-            decision: {
-                decidedAt: "",
-                decidedBy: "",
-                decisionChoice: E_Decision.REJECT
-            }
-        } ;
-        // save token
-        return sut ;
-    }
 
 }
 
-function createToken(createdFor: T_IndId, detail: string, dataObject: T_DataObject, 
-    decisionExecutor: I_TokenDecisionExecuter, decisionChoices: E_Decision[]): T_SingleUseToken {
-    const sut: T_SingleUseToken = {
-        token: randomString(),
-        createdAt: timestamp(),
-        createdFor: createdFor,
-        detail: detail,
-        dataObject: dataObject,
-        decisionExecutor: decisionExecutor,
-        decisionChoices: decisionChoices,
-        decision: {
-            decidedAt: "",
-            decidedBy: "",
-            decisionChoice: E_Decision.REJECT
-        }
-    } ;
-    // save token
-    return sut ;
-}
