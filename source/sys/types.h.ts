@@ -6,7 +6,7 @@
  */
 
 
- 
+
 /**
  * Type for integers.
  */
@@ -72,5 +72,10 @@ export type T_DataType = string | number;
 export type T_DataObject = {
     [index: string]: T_DataType | T_DataObject
 }
+
+/**
+ * Storage type - a valid JSON string.
+ */
+export type T_JsonStr = string;
 
 

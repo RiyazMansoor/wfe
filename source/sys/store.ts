@@ -1,97 +1,126 @@
-
-import { T_DataObject } from "./types.h";
-
-
 /**
- * Unique identifiers for data store entity kinds.
+ * The database access system and the entities that get serialized and desrialized.
+ * Comes with a mock inefficient memory database to check code against.
+ * Production systems must use production databases for the store.
+ * 
+ * @author riyaz.mansoor@gmail.com
+ * @created 20221020 v0.1
  */
-export type T_Kind = string;
-  
+
+import { T_DataObject, T_DataType, T_JsonStr } from "./types.h";
+
+
 /**
- * Storage type - a valid JSON string.
- */ 
-export type T_JsonStr = string;
+ * Unique identifier for data store entity objects.
+ */
+export type T_EntityType = string;
 
 /**
  * All data entities will carry its data in this type.
+ * The property @kind is used to deserialize into the correcte entity.
+ * The property @data contains all the business information of the entity.
  */
 export type T_Entity = {
-    kind: T_Kind,
-    data?: T_DataObject
+    entityType: T_EntityType,
+    entityData?: T_DataObject
 }
-
 
 
 /**
- * Primary interface for all object/entities that must be written to the datastore.
+ * The base entity class that must be extended by all entity classes.
  */
-export interface I_Entity {
+export abstract class AbstractEntity {
 
     /**
-     * @returns The 'kind' of the object (similar to table).
+     * The database instance for saving and fetching entities.
+     * Typically this will be assigned using configuration settings to the appropriate database.
      */
-    getKind(): T_Kind;
+    // protected readonly DB: I_Datastore;
 
     /**
-     * Default toJSON() method - to do Typescript to plain JSON conversions.
-     * @returns A plain JSON object for serialization.
+     * Converts plain JSON data to the entity data types.
+     * Also configures the database for this entity.
+     * @param entity The data for this entity.
      */
-    toJSON(): T_DataObject;
-
-}
-
-export class AbstractEntity implements I_Entity {
-
-    constructor(entity: T_Entity) {
+    constructor(entity?: T_Entity) {
         // empty constructor
-        console.log(entity);
+        // this.DB = MemoryDb.getInstance();
     }
 
-    getKind(): T_Kind {
+    /**
+     * @see T_EntityType
+     * @returns The name of the instance class.
+     */
+    getEntityType(): T_EntityType {
         return this.constructor.name;
     }
 
+    /**
+     * Default toJSON() method - to convert objects to plain JSON.
+     * Data that is not compatible with T_DataObject (eg: Enums) conversion happens here.
+     * @see constructor Where converstion from plain JSON to entity object data.
+     * @returns A plain JSON object for serialization.
+     */
     toJSON(): T_Entity {
-        return { "kind": this.getKind() };
+        return { "entityType": this.getEntityType() };
     }
 
 
 }
 
-
+/**
+ * The interface of the singleton class that will register all entity objects and
+ * create instances of the entity objects when required.
+ */
 export interface I_EntityRegister {
 
-    registerEntity(kind: T_Kind, clazz: new (entity:T_Entity) => AbstractEntity): void;
+    /**
+     * Registers the class type to a matching name T_Kind.
+     * @param kind The name of the class type to be registered.
+     * @param clazz The class which must have constructor which takes T_Entity
+     */
+    registerEntity(kind: T_EntityType, clazz: new (entity: T_Entity) => AbstractEntity): void;
 
+    /**
+     * @param entity The entity data  to convert to entity object.
+     * @return The  created matching entity object. 
+     */
     newEntity(entity: T_Entity): AbstractEntity;
 
 }
 
+/**
+ * The singleton register of entity objects.
+ * And that which creates registered entity objects as per the entity data.
+ */
 export class EntityRegister implements I_EntityRegister {
 
-    private static registrar: EntityRegister;
+    private static registrar: I_EntityRegister;
 
-    private registered: Map<T_Kind, new (entity:T_Entity) => AbstractEntity> = new Map();
+    private registered: Map<T_EntityType, new (entity: T_Entity) => AbstractEntity> = new Map();
 
     private constructor() {
         // empty
     }
 
-    getInstance(): EntityRegister {
+    /**
+     * @returns The singleton entity register.
+     */
+    getInstance(): I_EntityRegister {
         if (!EntityRegister.registrar) {
             EntityRegister.registrar = new EntityRegister();
         }
         return EntityRegister.registrar;
     }
-    
-    registerEntity(kind: T_Kind, clazz: new (entity: T_Entity) => AbstractEntity): void {
+
+    registerEntity(kind: T_EntityType, clazz: new (entity: T_Entity) => AbstractEntity): void {
         this.registered.set(kind, clazz);
     }
 
     newEntity(entity: T_Entity): AbstractEntity {
-        const clazz = this.registered.get(entity.kind);
+        const clazz = this.registered.get(entity.entityType);
         if (!clazz) {
-            throw `EntityRegister :: Entity Class=${entity.kind} is NOT Registered!`;
+            throw `EntityRegister :: Entity Class=${entity.entityType} is NOT Registered!`;
         }
         return new clazz(entity);
     }
@@ -104,84 +133,153 @@ export class EntityRegister implements I_EntityRegister {
  */
 export interface I_Datastore {
 
-    dbSearch(kind: T_Kind, keys: T_DataObject): T_DataObject[];
+    /**
+     * @param searchKeys The search keys and values.
+     * @param entityType The type of entity to search.
+     * @return Array of matching entity data.
+     */
+    dbSearch(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[];
 
-    dbDelete(kind: T_Kind, keys: T_DataObject): T_DataObject[];
+    /**
+     * @param searchKeys The search keys and values.
+     * @param entityType The type of entity to search.
+     * @return Array of matching entity data that was deleted.
+     */
+    dbDelete(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[];
 
-    dbUpsert(keys: T_DataObject, data: T_Entity): void;
+    /**
+     * Updates matching data or inserts data.
+     * @param searchKeys The search keys and values.
+     * @param data The entity data to update or insert.
+     */
+    dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): void;
+
+    /**
+     * Just inserts data.
+     * @param data The entity data to update or insert.
+     */
+    dbInsert(data: T_Entity): void;
 
 }
 
+/**
+ * Global DB connections configurator.
+ */
+export class DbConnections {
+
+    private static dbcon: I_Datastore;
+
+    private constructor() {
+
+    }
+
+    /**
+     * TODO: should be selected by configuration - currently to stub MemoryDb.
+     * @returns The datastore to read and write data.
+     */
+    static getInstance(): I_Datastore {
+        if (!DbConnections.dbcon) {
+            DbConnections.dbcon = MemoryDb.getInstance();
+        }
+        return DbConnections.dbcon;
+    }
+
+}
 
 
 
 
 ////// implementation for in memory store
 
+
+export type F_DbFieldCriteria = (fldValue: T_DataType) => boolean;
+export type T_DbTypeCriteria = {
+    [index: string]: F_DbFieldCriteria
+}
+
 export class MemoryDb implements I_Datastore {
 
     private static db: I_Datastore;
 
-    private MEMDB: Map<T_Kind, Set<T_JsonStr>> = new Map();
+    private MEMDB: Map<T_EntityType, Set<T_JsonStr>> = new Map();
 
     private constructor() {
 
     }
 
-    getInstance(): I_Datastore {
+    static getInstance(): I_Datastore {
         if (!MemoryDb.db) {
             MemoryDb.db = new MemoryDb();
         }
         return MemoryDb.db;
     }
 
-    hasKeys(keys: T_DataObject, data: T_JsonStr): boolean {
+    /**
+     * @param criteria The properties to match.
+     * @param data The data object being matched.
+     * @returns true if the @keys values match that of the @data
+     */
+    private matches(criteria: T_DbTypeCriteria, data: T_JsonStr): boolean {
         const datum = JSON.parse(data);
-        for (const [key, value] of Object.entries(keys)) {
-            if (datum[key] != value) return false;
+        for (const [key, func] of Object.entries(criteria)) {
+            if (!func(datum[key])) return false;
         }
         return true;
     }
 
-    getSet(kind: T_Kind): Set<T_JsonStr> {
-        const set = this.MEMDB.get(kind);
+    /**
+     * @param entityType The type of the entity to search.
+     * @throws If matching Set is not found.
+     * @returns The matching Set of for @entityType
+     */
+    private getSet(entityType: T_EntityType): Set<T_JsonStr> {
+        const set = this.MEMDB.get(entityType);
         if (!set) {
-            throw `mem_db :: Kind=${kind} NOT Found!`;
+            throw `MemoryDb :: Kind=${entityType} NOT Found!`;
         }
         return set;
     }
 
-    getMatches(keys: T_DataObject, set: Set<T_JsonStr>): T_JsonStr[] {
+    /**
+     * @param keys The properties to match.
+     * @param set The Set to search data.
+     * @returns Array of matching (string) data objects.
+     */
+    private getMatches(criteria: T_DbTypeCriteria, set: Set<T_JsonStr>): T_JsonStr[] {
         const result: T_JsonStr[] = [];
         for (const jsonStr of set) {
-            if (this.hasKeys(keys, jsonStr)) {
+            if (this.matches(criteria, jsonStr)) {
                 result.push(jsonStr);
             }
         }
         return result;
     }
 
-    dbSearch(kind: T_Kind, keys: T_DataObject): T_DataObject[] {
-        const set = this.getSet(kind);
-        const matches = this.getMatches(keys, set);
+    dbSearch(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[] {
+        const set = this.getSet(entityType);
+        const matches = this.getMatches(criteria, set);
         return matches.map(jsonStr => JSON.parse(jsonStr));
     }
 
-    dbDelete(kind: T_Kind, keys: T_DataObject): T_DataObject[] {
-        const set = this.getSet(kind);
-        const matches = this.getMatches(keys, set);
+    dbDelete(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[] {
+        const set = this.getSet(entityType);
+        const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
         return matches.map(jsonStr => JSON.parse(jsonStr));
     }
 
-    dbUpsert(keys: T_DataObject, data: T_Entity): void {
-        const set = this.getSet(data.kind);
-        const matches = this.getMatches(keys, set);
+    dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): void {
+        const set = this.getSet(data.entityType);
+        const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
+        set.add(JSON.stringify(data));
+    }
+
+    dbInsert(data: T_Entity): void {
+        const set = this.getSet(data.entityType);
         set.add(JSON.stringify(data));
     }
 
 
 }
-
 
