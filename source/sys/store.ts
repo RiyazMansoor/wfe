@@ -36,7 +36,7 @@ export abstract class AbstractEntity {
      * Also configures the database for this entity.
      * @param entity The data for this entity.
      */
-    constructor(entity?: T_Entity) {
+    constructor(entity: T_Entity) {
         // empty constructor
     }
 
@@ -49,18 +49,30 @@ export abstract class AbstractEntity {
     }
 
     /**
-     * Default toJSON() method - to convert objects to plain JSON.
-     * Data that is not compatible with T_DataObject (eg: Enums) conversion happens here.
-     * @see constructor Where converstion from plain JSON to entity object data.
-     * @returns A plain JSON object for serialization.
+     * @returns The entity data structure as a JSON string.
+     */
+    protected abstract getEntityDataAsJsonStr(): string;
+
+    protected abstract getUniqueIndexCriteria(): T_DbTypeCriteria;
+
+    /**
+     * Default toJSON() method - to convert entities to plain JSON.
+     * @returns A plain JSON object.
      */
     toJSON(): T_Entity {
         return {
             entityType: this.getEntityType(),
-            entityData: { dummy: "dummy" }
+            entityData: JSON.parse(this.getEntityDataAsJsonStr())
         };
     }
 
+    dbInsert(): void {
+        return DbConnections.getInstance().dbInsert(this.toJSON());
+    }
+
+    dbUpsert(): void {
+        DbConnections.getInstance().dbUpsert(this.getUniqueIndexCriteria(), this.toJSON());
+    }
 
 }
 
@@ -147,8 +159,9 @@ export interface I_Datastore {
      * Updates matching data or inserts data.
      * @param criteria The search keys and values.
      * @param data The entity data to update or insert.
+     * @return The deleted entities.
      */
-    dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): void;
+    dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): T_Entity[];
 
     /**
      * Just inserts data.
@@ -264,11 +277,12 @@ export class MemoryDb implements I_Datastore {
         return matches.map(jsonStr => JSON.parse(jsonStr));
     }
 
-    dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): void {
+    dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): T_Entity[] {
         const set = this.getSet(data.entityType);
         const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
         set.add(JSON.stringify(data));
+        return matches;
     }
 
     dbInsert(data: T_Entity): void {

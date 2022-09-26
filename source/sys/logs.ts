@@ -40,7 +40,6 @@ type T_Log = {
     details: string
 }
 
-
 /**
  * This interface is for sys admins - to review/trace issues. 
  * It is expected that finer searching, filtering will happen client side.
@@ -91,31 +90,35 @@ export class LogEntity extends AbstractEntity {
 
     constructor(entity: T_Entity) {
         super(entity);
-        this.log = {
-            timestamp: entity.entityData.timestamp as T_Timestamp,
-            executor: entity.entityData.executor as T_IndId,
-            executingFor: entity.entityData.executingFor as T_IndId,
-            api: entity.entityData.api as T_ApiName,
-            parameters: entity.entityData.parameters as T_DataObject,
-            result: E_LogResult[entity.entityData.result as string],
-            details: entity.entityData.details as string
-        };
+        this.log = LogEntity.toTypescript(entity.entityData);
     }
 
-    /**
-     * @see super.toJSON()
-     * @throws If there is no information to log.
-     * @returns The plain JSON log object.
-     */
-    toJSON(): T_Entity {
-        const entity = super.toJSON();
-        entity.entityData = JSON.parse(JSON.stringify(this.log));
-        return entity;
+    static toTypescript(plainJSON: T_DataObject): T_Log {
+        const log: T_Log = {
+            timestamp: plainJSON.timestamp as T_Timestamp,
+            executor: plainJSON.executor as T_IndId,
+            executingFor: plainJSON.executingFor as T_IndId,
+            api: plainJSON.api as T_ApiName,
+            parameters: plainJSON.parameters as T_DataObject,
+            result: E_LogResult[plainJSON.result as string],
+            details: plainJSON.details as string
+        };
+        return log;
+    }
+    
+    protected getEntityDataAsJsonStr(): string {
+        return JSON.stringify(this.log);
+    }
+
+    protected getUniqueIndexCriteria(): T_DbTypeCriteria {
+        const criteria: T_DbTypeCriteria = {
+        }
+        return criteria;
     }
 
 }
 
-export class LogAPI implements I_LogAPI {
+export class MemoryDbLogAPI implements I_LogAPI {
 
     /**
      * The singleton instance of the Log API.
@@ -130,10 +133,10 @@ export class LogAPI implements I_LogAPI {
      * @returns The singleton instance of Log API
      */
     static getInstance(): I_LogAPI {
-        if (!LogAPI.logAPI) {
-            LogAPI.logAPI = new LogAPI();
+        if (!MemoryDbLogAPI.logAPI) {
+            MemoryDbLogAPI.logAPI = new MemoryDbLogAPI();
         }
-        return LogAPI.logAPI;
+        return MemoryDbLogAPI.logAPI;
     }
 
     /**

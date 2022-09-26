@@ -64,7 +64,7 @@ export type T_ApiName = string;
 /**
 * Fundamentally, all data in this sytem will be either string or number.
 */
-export type T_DataType = string | number;
+export type T_DataType = string | number | boolean | string[];
 
 /**
  * A container object for data. 
