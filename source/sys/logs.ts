@@ -2,72 +2,68 @@
  * A sub-system to log user and system actions happening in this project.
  * 
  * @author riyaz.mansoor@gmail.com
- * @created 20220920 v0.1
+ * @created 20221020 v0.1
  */
 
 
-import { T_DateRange, T_Timestamp, T_IndId, T_ServiceClientId, T_JsonStr, T_DataObject, T_DataType } from "./types";
-import { T_Entity, AbstractEntity, T_EntityType, DbConnections, T_DbTypeCriteria } from "./store";
-import { timestamp, executorId, executingForId, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./util";
+import { T_DateRange, T_Timestamp, T_IndId, T_DataObject, T_OrgId, T_ApiName } from "./types";
+import { T_Entity, AbstractEntity, T_EntityType, DbConnections, T_DbTypeCriteria, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./store";
+import { timestamp, executorId, executingForId } from "./util";
 
 
 /**
- * 
+ * The result of user actions (API calls) for log purposes.
  */
-enum E_EntityAction { READ = "READ", WRITE = "WRITE" }
+export enum E_LogResult {
+    COMPLETED_SUCCESS = "COMPLETED_SUCCESS",
+    COMPLETED_FAILURE = "COMPLETED_FAILURE",
+    UNEXPECTED_ERROR = "UNEXPECTED_ERROR"
+}
 
 /**
  * Type for audit log entry for a user or system action.
  * @timestamp When the action happened.
  * @executor Individual executing the action.
  * @executingFor Client on whose behalf the action was executed.
- * @entityType The enity type on which the action was executed.
- * @entityAction Can be on of READ (list, search, view) or WRITE (insert, update, delete) actions.
- * @entityData The criteria to READ or json string of the entity data after the action was executed.
- * @details The description of the action.
+ * @api The API called.
+ * @parameters The parameters called with.
+ * @result One of { Success, Failure, Error }.
+ * @details The detaisl - eg; Error description for Error result.
  */
 type T_Log = {
     timestamp: T_Timestamp,
     executor: T_IndId,
-    executingFor: T_ServiceClientId,
-    entityType: T_EntityType,
-    entityAction: E_EntityAction,
-    entityData: T_JsonStr,
+    executingFor: T_IndId | T_OrgId,
+    api: T_ApiName,
+    parameters: T_DataObject,
+    result: E_LogResult,
     details: string
 }
 
-/**
- * Interface to interact with type structure T_LogRecord.
- * This interface is for internal processes - to log user or system actions.
- * Implementation must be a singleton structure that all can access.
- */
-interface I_LogActions {
-
-    /**
-     * Inserts a new log record.
-     * @param entityType The enity kind (or type) on which the action was executed.
-     * @param entityAction Can be on of READ (list, search, view) or WRITE (insert, update, delete) actions.
-     * @param entityData The criteria to READ or json string of the entity data after the action was executed.
-     * @param details The description of the action.
-     */
-    log(entityType: T_EntityType, entityAction: E_EntityAction,
-        entityData: T_JsonStr, details: string): void;
-
-}
 
 /**
  * This interface is for sys admins - to review/trace issues. 
  * It is expected that finer searching, filtering will happen client side.
  */
-interface I_LogAPI {
+export interface I_LogAPI {
 
     /**
+     * Inserts a new log record.
+     * It is expected this method will be called from all over, but internally.
+     * Hence, NO role access restrictions.
+     * @see T_Log for parameter information
+     */
+    log(api: T_ApiName, parameters: T_DataObject, result: E_LogResult, details: string): void;
+
+    /**
+     * Log access will be restricted to specific roles.
      * @param dateRange The date range to search.
      * @returns All records for the supplied criteria.
      */
     fetch(dateRange: T_DateRange): T_Entity[];
 
     /**
+     * Log access will be restricted to specific roles.
      * @param dateRange The date range to search.
      * @param executor The individual who effected the log action.
      * @returns All records for the supplied criteria.
@@ -75,6 +71,7 @@ interface I_LogAPI {
     fetchByExecutor(dateRange: T_DateRange, executor: T_IndId): T_Entity[];
 
     /**
+     * Log access will be restricted to specific roles.
      * @param dateRange The date range to search.
      * @param entityType The entity type of the log action.
      * @returns All records for the supplied criteria.
@@ -88,32 +85,21 @@ interface I_LogAPI {
 /**
  * Entity class for a Log object.
  */
-export class LogEntity extends AbstractEntity implements I_LogActions {
+export class LogEntity extends AbstractEntity {
 
-    private logRecord: T_Log;
+    private log: T_Log;
 
-    constructor(entity?: T_Entity) {
+    constructor(entity: T_Entity) {
         super(entity);
-        if (entity) {
-            this.logRecord = entity.entityData as T_Log;
-        }
-    }
-
-    log(entityType: T_EntityType, entityAction: E_EntityAction,
-        entityData: T_JsonStr, details: string): void {
-        if (this.logRecord) {
-            throw `LogRecord :: log() called to overwrite existing data`;
-        }
-        this.logRecord = {
-            timestamp: timestamp(),
-            executor: executorId(),
-            executingFor: executingForId(),
-            entityType: entityType,
-            entityAction: entityAction,
-            entityData: entityData,
-            details: details
+        this.log = {
+            timestamp: entity.entityData.timestamp as T_Timestamp,
+            executor: entity.entityData.executor as T_IndId,
+            executingFor: entity.entityData.executingFor as T_IndId,
+            api: entity.entityData.api as T_ApiName,
+            parameters: entity.entityData.parameters as T_DataObject,
+            result: E_LogResult[entity.entityData.result as string],
+            details: entity.entityData.details as string
         };
-        DbConnections.getInstance().dbInsert(this.toJSON());
     }
 
     /**
@@ -122,11 +108,8 @@ export class LogEntity extends AbstractEntity implements I_LogActions {
      * @returns The plain JSON log object.
      */
     toJSON(): T_Entity {
-        if (!this.logRecord) {
-            throw `LogRecord :: toJSON() called without any log data`;
-        }
         const entity = super.toJSON();
-        entity.entityData = JSON.parse(JSON.stringify(this.logRecord));
+        entity.entityData = JSON.parse(JSON.stringify(this.log));
         return entity;
     }
 
@@ -160,6 +143,23 @@ export class LogAPI implements I_LogAPI {
      */
     private dbSearch(criteria: T_DbTypeCriteria): T_Entity[] {
         return DbConnections.getInstance().dbSearch(criteria, LogEntity.constructor.name);
+    }
+
+    log(api: T_ApiName, parameters: T_DataObject, result: E_LogResult, details: string): void {
+        const log: T_Log = {
+            timestamp: timestamp(),
+            executor: executorId(),
+            executingFor: executingForId(),
+            api: api,
+            parameters: parameters,
+            result: result,
+            details: details
+        };
+        const entity: T_Entity = {
+            entityType: LogEntity.constructor.name,
+            entityData: JSON.parse(JSON.stringify(log))
+        }
+        DbConnections.getInstance().dbInsert(entity);
     }
 
     fetch(dateRange: T_DateRange): T_Entity[] {

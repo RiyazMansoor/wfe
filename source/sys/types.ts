@@ -2,7 +2,7 @@
  * The fundamental types used in this project.
  * 
  * @author riyaz.mansoor@gmail.com
- * @created 20220920 v0.1
+ * @created 20221020 v0.1
  */
 
 
@@ -40,10 +40,6 @@ export type T_IndId = string;
  */
 export type T_OrgId = string;
 
-/**
- * Services can be requested on an individual basis or on behalf of an organization.
- */
-export type T_ServiceClientId = T_IndId | T_OrgId;
 
 /**
  * HTML text.
@@ -56,13 +52,18 @@ export type T_HTML = string;
 export type T_URL = string;
 
 /**
- * Authorization roles. By convention role specializations are separated by a dash "-".
+ * Storage type - a valid JSON string.
  */
-export type T_RoleId = string;
+export type T_JsonStr = string;
 
 /**
- * Fundamentally, all data in this sytem will be either string or number.
+ * Identify API names as used in the system.
  */
+export type T_ApiName = string;
+
+/**
+* Fundamentally, all data in this sytem will be either string or number.
+*/
 export type T_DataType = string | number;
 
 /**
@@ -73,9 +74,6 @@ export type T_DataObject = {
     [index: string]: T_DataType | T_DataObject
 }
 
-/**
- * Storage type - a valid JSON string.
- */
-export type T_JsonStr = string;
+
 
 

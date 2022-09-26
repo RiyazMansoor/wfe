@@ -2,12 +2,12 @@
  * Common functions.
  * 
  * @author riyaz.mansoor@gmail.com
- * @created 20220920
+ * @created 20221020
  */
 
 
 import { F_DbFieldCriteria } from "./store";
-import { T_DataType, T_Date, T_DateRange, T_IndId, T_Integer, T_Timestamp } from "./types";
+import { T_DataType, T_DateRange, T_IndId, T_Integer, T_Timestamp } from "./types";
 
 /**
  * Returns a random alphanumeric string of supplied length.
@@ -48,46 +48,17 @@ export function executingForId(): T_IndId {
     return "TODO";
 }
 
-
-export function hasRole(...roles: string[]): boolean {
+/**
+ * Identifies the executor (impersonated) and if the individuals access roles
+ * are the supplied access role, then access is granted.
+ * @see executingForId() 
+ * @param roleKey Of role with access.
+ * @returns true if executor has access.
+ */
+export function hasRole(roleKey: string): boolean {
     const individual = executingForId();
+    // TODO : role module and match role key to callers roles.
     return false;
 }
 
-
-////// Of type F_DbFieldCriteria 
-
-/**
- * @param dateRange The date range to fall within.
- * @returns Date range within criterion function for the supplied @dateRange
- */
-export function dbFieldCriteriaDateRangeIn(dateRange: T_DateRange): F_DbFieldCriteria {
-    const dateFrom: Date = new Date(dateRange.from);
-    const dateTo: Date = new Date(dateRange.to);
-    return (value: T_DataType) => {
-        const dateTest = new Date(value);
-        return dateFrom <= dateTest && dateTest <= dateTo;
-    }
-}
-
-/**
- * @param dateRange The date range to fall without.
- * @returns Date range without criterion function for the supplied @dateRange
- */
-export function dbFieldCriteriaDateRangeNotIn(dateRange: T_DateRange): F_DbFieldCriteria {
-    const func = dbFieldCriteriaDateRangeIn(dateRange);
-    return (value: T_DataType) => {
-        return !func(value);
-    }
-}
-
-/**
- * @param baseValue The value to check equality.
- * @returns Equality criterion function for the supplied @baseValue
- */
-export function dbFieldCriteriaEqual(baseValue: T_DataType): F_DbFieldCriteria {
-    return (value: T_DataType) => {
-        return value === baseValue;
-    }
-}
 

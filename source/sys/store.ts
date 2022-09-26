@@ -7,7 +7,7 @@
  * @created 20221020 v0.1
  */
 
-import { T_DataObject, T_DataType, T_JsonStr } from "./types";
+import { T_DataObject, T_DataType, T_DateRange, T_JsonStr } from "./types";
 
 
 /**
@@ -22,7 +22,7 @@ export type T_EntityType = string;
  */
 export type T_Entity = {
     entityType: T_EntityType,
-    entityData?: T_DataObject
+    entityData: T_DataObject
 }
 
 
@@ -55,7 +55,10 @@ export abstract class AbstractEntity {
      * @returns A plain JSON object for serialization.
      */
     toJSON(): T_Entity {
-        return { "entityType": this.getEntityType() };
+        return {
+            entityType: this.getEntityType(),
+            entityData: { dummy: "dummy" }
+        };
     }
 
 
@@ -273,6 +276,42 @@ export class MemoryDb implements I_Datastore {
         set.add(JSON.stringify(data));
     }
 
-
 }
+
+////// Of type F_DbFieldCriteria - specifically for stub MemoryDb
+
+/**
+ * @param dateRange The date range to fall within.
+ * @returns Date range within criterion function for the supplied @dateRange
+ */
+export function dbFieldCriteriaDateRangeIn(dateRange: T_DateRange): F_DbFieldCriteria {
+    const dateFrom: Date = new Date(dateRange.from);
+    const dateTo: Date = new Date(dateRange.to);
+    return (value: T_DataType) => {
+        const dateTest = new Date(value);
+        return dateFrom <= dateTest && dateTest <= dateTo;
+    }
+}
+
+/**
+ * @param dateRange The date range to fall without.
+ * @returns Date range without criterion function for the supplied @dateRange
+ */
+export function dbFieldCriteriaDateRangeNotIn(dateRange: T_DateRange): F_DbFieldCriteria {
+    const func = dbFieldCriteriaDateRangeIn(dateRange);
+    return (value: T_DataType) => {
+        return !func(value);
+    }
+}
+
+/**
+ * @param baseValue The value to check equality.
+ * @returns Equality criterion function for the supplied @baseValue
+ */
+export function dbFieldCriteriaEqual(baseValue: T_DataType): F_DbFieldCriteria {
+    return (value: T_DataType) => {
+        return value === baseValue;
+    }
+}
+
 
