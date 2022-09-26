@@ -7,7 +7,7 @@
 
 
 import { F_DbFieldCriteria } from "./store";
-import { T_DataType, T_Date, T_DateRange, T_IndId, T_Integer, T_Timestamp } from "./types.h";
+import { T_DataType, T_Date, T_DateRange, T_IndId, T_Integer, T_Timestamp } from "./types";
 
 /**
  * Returns a random alphanumeric string of supplied length.
@@ -49,8 +49,18 @@ export function executingForId(): T_IndId {
 }
 
 
+export function hasRole(...roles: string[]): boolean {
+    const individual = executingForId();
+    return false;
+}
 
 
+////// Of type F_DbFieldCriteria 
+
+/**
+ * @param dateRange The date range to fall within.
+ * @returns Date range within criterion function for the supplied @dateRange
+ */
 export function dbFieldCriteriaDateRangeIn(dateRange: T_DateRange): F_DbFieldCriteria {
     const dateFrom: Date = new Date(dateRange.from);
     const dateTo: Date = new Date(dateRange.to);
@@ -60,6 +70,10 @@ export function dbFieldCriteriaDateRangeIn(dateRange: T_DateRange): F_DbFieldCri
     }
 }
 
+/**
+ * @param dateRange The date range to fall without.
+ * @returns Date range without criterion function for the supplied @dateRange
+ */
 export function dbFieldCriteriaDateRangeNotIn(dateRange: T_DateRange): F_DbFieldCriteria {
     const func = dbFieldCriteriaDateRangeIn(dateRange);
     return (value: T_DataType) => {
@@ -67,6 +81,10 @@ export function dbFieldCriteriaDateRangeNotIn(dateRange: T_DateRange): F_DbField
     }
 }
 
+/**
+ * @param baseValue The value to check equality.
+ * @returns Equality criterion function for the supplied @baseValue
+ */
 export function dbFieldCriteriaEqual(baseValue: T_DataType): F_DbFieldCriteria {
     return (value: T_DataType) => {
         return value === baseValue;

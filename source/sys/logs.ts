@@ -6,9 +6,9 @@
  */
 
 
-import { T_DateRange, T_Timestamp, T_IndId, T_ServiceClientId, T_JsonStr, T_DataObject, T_DataType } from "./types.h";
+import { T_DateRange, T_Timestamp, T_IndId, T_ServiceClientId, T_JsonStr, T_DataObject, T_DataType } from "./types";
 import { T_Entity, AbstractEntity, T_EntityType, DbConnections, T_DbTypeCriteria } from "./store";
-import { timestamp, executorId, executingForId, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./util.h";
+import { timestamp, executorId, executingForId, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./util";
 
 
 /**
@@ -18,7 +18,6 @@ enum E_EntityAction { READ = "READ", WRITE = "WRITE" }
 
 /**
  * Type for audit log entry for a user or system action.
- * There is no primary key.
  * @timestamp When the action happened.
  * @executor Individual executing the action.
  * @executingFor Client on whose behalf the action was executed.
@@ -187,3 +186,5 @@ export class LogAPI implements I_LogAPI {
     }
 
 }
+
+

@@ -8,9 +8,11 @@
 
 
 
-import { T_IndId, T_HTML, T_Timestamp, T_DataObject } from "./types.h" ;
-import { randomString, timestamp } from "./util.h" ;
-import { MEM_F_Write, MEM_F_Read } from "./store" ;
+import { T_Entity } from "./store";
+import { T_IndId, T_HTML, T_Timestamp, T_DataObject } from "./types" ;
+import { randomString, timestamp } from "./util" ;
+
+
 
 /**
 * A random string used as an access token.
@@ -26,7 +28,7 @@ export type T_TokenExecutorId = string ;
  * Decisions the user can make based on the context.
  */
 export enum E_TokenAction {
-    ACCEPT = "ACCEPT", REJECT = "ACCEPT"
+    ACCEPT = "ACCEPT", REJECT = "REJECT"
 }
 
 
@@ -37,6 +39,7 @@ export interface I_TokenExecuter {
 
     /**
      * This method is used to match a token to its matching I_TokenExecuter implementation.
+     * Be default uses the class name of the instance class.
      * @returns The unique identifier for this token decision executor.
      */
     executorId() : T_TokenExecutorId ;
@@ -47,9 +50,24 @@ export interface I_TokenExecuter {
      * @param decision The decision (button clicked) by the user.
      * @param data The pre-prepared data object (during token creation).
      */
-    execute( decision: E_TokenAction, data: T_DataObject ): void;
+    execute(decision: E_TokenAction, data: T_DataObject): void;
 
 }
+
+/**
+ * Default abstract base class for I_TokenExecutor implementations.
+ * The business logic of the user decision must be implemented in concrete classes.
+ */
+export abstract class AbstractTokenExecutor implements I_TokenExecuter {
+    
+    executorId(): T_TokenExecutorId {
+        return this.constructor.name;
+    }
+    
+    abstract execute(decision: E_TokenAction, data: T_DataObject): void;
+
+}
+
 
 /**
  * The interface for a (singleton) global register of all I_TokenDecisionExecuter implementations.
@@ -62,13 +80,50 @@ export interface I_TokenExecuterRegister {
      * @see getExecutor()
      * @param tokenExecutor The I_TokenExecuter implementation to register.
      */
-    registerExecutor( tokenExecutor: I_TokenExecuter ): void ;
+    registerExecutor(tokenExecutor: I_TokenExecuter): void ;
 
     /**
      * @param executorId The unique T_TokenExecutorId of the I_TokenExecuter to return.
      * @return The matching I_TokenExecuter implementation.
      */
-    getExecutor( executorId: T_TokenExecutorId ): I_TokenExecuter ;
+    getExecutor(executorId: T_TokenExecutorId): I_TokenExecuter ;
+
+}
+
+/**
+ * Singleton token executor register
+ */
+export class TokenExecutorRegister implements I_TokenExecuterRegister {
+
+    private static instance: TokenExecutorRegister ;
+
+    private registered: Map<T_TokenExecutorId, I_TokenExecuter> = new Map() ;
+
+    private constructor() {
+        // empty private constructor for singleton
+    }
+
+    /**
+     * @returns Singleton instance of TokenExecutorRegister.
+     */
+    static getInstance() : TokenExecutorRegister {
+        if (!TokenExecutorRegister.instance) {
+            TokenExecutorRegister.instance = new TokenExecutorRegister() ;
+        }
+        return TokenExecutorRegister.instance ;
+    }
+
+    registerExecutor(tokenExecutor: I_TokenExecuter): void {
+        this.registered.set(tokenExecutor.executorId(), tokenExecutor);
+    }
+
+    getExecutor(executorId: string): I_TokenExecuter {
+        const executor = this.registered.get(executorId);
+        if (!executor) {
+            throw `NO I_TokenExecuter registered for id=${executorId}`;
+        }
+        return executor;
+    }
 
 }
 
@@ -105,26 +160,6 @@ type T_Token = {
     }
 }
 
-/**
- * The API interface to interact with the system without logging in,
- * using the a one time usable access token.
- * @see T_Token
- */
-interface API_SingleUseToken {
-
-    /**
-     * Accepts a users decision, authenticated via the single use access token.
-     * A successful token validation will create a new instance of @decisionExecutor class
-     * and call the @tokenExecute method with @decisionChoice and @dataObject parameters.
-     * @note Does NOT enforce @createdFor and @consumedBy to be same.
-     * @throws If the token has already been consumed.
-     * @param tokenId The unique single use access token.
-     * @param userAction The decision made by the user (button clicked).
-     * @return true if token was submitted/consumed successfully.
-     */
-    submit(tokenId: T_TokenId, userAction: E_TokenAction): boolean;
-
-}
 
 
 /**
@@ -132,7 +167,7 @@ interface API_SingleUseToken {
  * The implementation will be a singleton pattern.
  * @see T_Token
  */
- export interface I_TokenRegister {
+export interface I_TokenRegister {
 
     /**
      * Creates and returns a single use access token.
@@ -154,43 +189,33 @@ interface API_SingleUseToken {
 
 }
 
+/**
+ * The API interface to interact with the system without logging in,
+ * using the a one time usable access token.
+ * @see T_Token
+ */
+interface API_Token {
+
+    fetchToken(tokenId: T_TokenId): T_Entity;
+
+
+    /**
+     * Accepts a users decision, authenticated via the single use access token.
+     * A successful token validation will create a new instance of @decisionExecutor class
+     * and call the @tokenExecute method with @decisionChoice and @dataObject parameters.
+     * @note Does NOT enforce @createdFor and @consumedBy to be same.
+     * @throws If the token has already been consumed.
+     * @param tokenId The unique single use access token.
+     * @param userAction The decision made by the user (button clicked).
+     * @return true if token was submitted/consumed successfully.
+     */
+    submit(tokenId: T_TokenId, userAction: E_TokenAction): boolean;
+
+}
 
 
 ////// Implementations 
 
-export class TokenExecutorRegister implements I_TokenExecuterRegister {
-
-    private static instance: TokenExecutorRegister ;
-
-    /**
-     * @returns Singleton instance of TokenExecutorRegister.
-     */
-    static getInstance() : TokenExecutorRegister {
-        if (!TokenExecutorRegister.instance) {
-            TokenExecutorRegister.instance = new TokenExecutorRegister() ;
-        }
-        return TokenExecutorRegister.instance ;
-    }
-
-    private executors: Map<T_TokenExecutorId, I_TokenExecuter> = new Map() ;
-
-    private constructor() {
-        // empty private constructor for singleton
-    }
-
-    registerExecutor(tokenExecutor: I_TokenExecuter): void {
-        this.executors.set(tokenExecutor.executorId(), tokenExecutor);
-    }
-
-    getExecutor(executorId: string): I_TokenExecuter {
-        const executor = this.executors.get(executorId);
-        if (!executor) {
-            throw `NO I_TokenExecuter registered for id=${executorId}`;
-        }
-        return executor;
-    }
-
-}
 
 
 
@@ -198,16 +223,17 @@ export class TokenRegister implements I_TokenRegister {
 
     private static instance: TokenRegister ;
 
-     static getInstance() : TokenRegister {
+    private constructor() {
+        
+    }
+
+    static getInstance() : TokenRegister {
         if ( !TokenRegister.instance ) {
             TokenRegister.instance = new TokenRegister() ;
         }
         return TokenRegister.instance ;
     }
 
-    private constructor() {
-        
-    }
     registerToken(createdFor: T_IndId, detail: string, data: T_DataObject, tokenExecutor: I_TokenExecuter, tokenActions: E_TokenAction[]): T_TokenId {
         throw new Error("Method not implemented.");
     }

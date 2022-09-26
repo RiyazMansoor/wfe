@@ -7,7 +7,7 @@
  * @created 20221020 v0.1
  */
 
-import { T_DataObject, T_DataType, T_JsonStr } from "./types.h";
+import { T_DataObject, T_DataType, T_JsonStr } from "./types";
 
 
 /**
@@ -32,19 +32,12 @@ export type T_Entity = {
 export abstract class AbstractEntity {
 
     /**
-     * The database instance for saving and fetching entities.
-     * Typically this will be assigned using configuration settings to the appropriate database.
-     */
-    // protected readonly DB: I_Datastore;
-
-    /**
      * Converts plain JSON data to the entity data types.
      * Also configures the database for this entity.
      * @param entity The data for this entity.
      */
     constructor(entity?: T_Entity) {
         // empty constructor
-        // this.DB = MemoryDb.getInstance();
     }
 
     /**
@@ -134,14 +127,14 @@ export class EntityRegister implements I_EntityRegister {
 export interface I_Datastore {
 
     /**
-     * @param searchKeys The search keys and values.
+     * @param criteria The search keys and values.
      * @param entityType The type of entity to search.
      * @return Array of matching entity data.
      */
     dbSearch(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[];
 
     /**
-     * @param searchKeys The search keys and values.
+     * @param criteria The search keys and values.
      * @param entityType The type of entity to search.
      * @return Array of matching entity data that was deleted.
      */
@@ -149,7 +142,7 @@ export interface I_Datastore {
 
     /**
      * Updates matching data or inserts data.
-     * @param searchKeys The search keys and values.
+     * @param criteria The search keys and values.
      * @param data The entity data to update or insert.
      */
     dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): void;
