@@ -31,13 +31,15 @@ export type T_Entity = {
  */
 export abstract class AbstractEntity {
 
+    private keyNames: string[];
+
     /**
-     * Converts plain JSON data to the entity data types.
-     * Also configures the database for this entity.
      * @param entity The data for this entity.
+     * @param keyNames The field names the uniquely identify the entity.
      */
-    constructor(entity: T_Entity) {
+    constructor(entity: T_Entity, keyNames: string[]) {
         // empty constructor
+        this.keyNames = keyNames
     }
 
     /**
@@ -51,9 +53,7 @@ export abstract class AbstractEntity {
     /**
      * @returns The entity data structure as a JSON string.
      */
-    protected abstract getEntityDataAsJsonStr(): string;
-
-    protected abstract getUniqueIndexCriteria(): T_DbTypeCriteria;
+    protected abstract getEntityDataAsJsonStr(): T_JsonStr;
 
     /**
      * Default toJSON() method - to convert entities to plain JSON.
@@ -293,6 +293,17 @@ export class MemoryDb implements I_Datastore {
 }
 
 ////// Of type F_DbFieldCriteria - specifically for stub MemoryDb
+
+export type FieldCriteria = Map<string, string | number>;
+
+export function dbUniqueCriteria(requirements: FieldCriteria): T_DbTypeCriteria {
+    const criteria: T_DbTypeCriteria = {}
+    for (const [key, value] of requirements.entries()) {
+        criteria[key] = dbFieldCriteriaEqual(value);
+    }
+    return criteria;
+}
+
 
 /**
  * @param dateRange The date range to fall within.

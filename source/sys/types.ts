@@ -42,6 +42,11 @@ export type T_OrgId = string;
 
 
 /**
+ * Class names as strings.
+ */
+export type T_ClassName = string;
+
+/**
  * HTML text.
  */
 export type T_HTML = string;

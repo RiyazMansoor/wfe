@@ -8,8 +8,9 @@
 
 
 
+import { AbstractRegistrar, I_RegisterItem, I_Registrar } from "./registrar";
 import { DbConnections, dbFieldCriteriaEqual, T_Entity, T_DbTypeCriteria, AbstractEntity } from "./store";
-import { T_IndId, T_HTML, T_Timestamp, T_DataObject } from "./types";
+import { T_IndId, T_HTML, T_Timestamp, T_DataObject, T_JsonStr } from "./types";
 import { executorId, timestamp } from "./util";
 
 
@@ -105,11 +106,10 @@ type T_Token = {
         this.token.consumed.at = timestamp(),
         this.token.consumed.by = executorId(),
         this.token.consumed.decision = decision;
-
-        DbConnections.getInstance().dbUpsert(this.toJSON());
+        this.dbUpsert();
     }
     
-    protected getEntityDataAsJsonStr(): string {
+    protected getEntityDataAsJsonStr(): T_JsonStr {
         return JSON.stringify(this.token);
     }
 
@@ -127,13 +127,7 @@ type T_Token = {
  * The interface that will be implemented to execute user decisions 
  * upon the submission of a valid token.
  */
- export interface I_TokenConsumer {
-
-    /**
-     * Be default uses the class name of the instance class.
-     * @returns The unique identifier for this token consumer.
-     */
-    getId(): T_TokenConsumerId;
+ export interface I_TokenConsumer extends I_RegisterItem {
 
     /**
      * This method will be called upon the submission of a valid token, 
@@ -146,76 +140,29 @@ type T_Token = {
 
 }
 
-/**
- * Default abstract base class for token consumer implementations.
- * The business logic of the user decision must be implemented in extending classes.
- */
-export abstract class AbstractTokenConsumer implements I_TokenConsumer {
-
-    getId(): T_TokenConsumerId {
-        return this.constructor.name;
-    }
-
-    abstract consume(decision: E_TokenAction, data: T_DataObject): boolean;
-
-}
-
-
-/**
- * The interface for a (singleton) global register of all I_TokenDecisionExecuter implementations.
- * Whenever a user successfully submits a token, the matching executor is fetched and executed. 
- */
-export interface I_TokenConsumerRegister {
-
-    /**
-     * Registers token implementations to their unique id.
-     * @param tokenConsumer The token Consumer.
-     */
-    registerTokenConsumer(tokenConsumer: I_TokenConsumer): void;
-
-    /**
-     * @param tokenConsumerId The unique id of the token consumer implementation.
-     * @throws If matching token consumer implementation is NOT found.
-     * @return The matching token consumer implementation.
-     */
-    getTokenConsumer(tokenConsumerId: T_TokenConsumerId): I_TokenConsumer;
-
-}
 
 /**
  * Singleton registry of token Consumers.
  */
-export class TokenConsumerRegister implements I_TokenConsumerRegister {
+export class TokenConsumptionRegistrar extends AbstractRegistrar<I_TokenConsumer> {
 
-    private static instance: TokenConsumerRegister;
-
-    private registered: Map<T_TokenConsumerId, I_TokenConsumer> = new Map();
+    private static instance: I_Registrar<I_TokenConsumer>;
 
     private constructor() {
+        super();
         // empty private constructor for singleton
     }
 
     /**
      * @returns Singleton instance of this class.
      */
-    static getInstance(): TokenConsumerRegister {
-        if (!TokenConsumerRegister.instance) {
-            TokenConsumerRegister.instance = new TokenConsumerRegister();
+    static getInstance(): I_Registrar<I_TokenConsumer> {
+        if (!TokenConsumptionRegistrar.instance) {
+            TokenConsumptionRegistrar.instance = new TokenConsumptionRegistrar();
         }
-        return TokenConsumerRegister.instance;
+        return TokenConsumptionRegistrar.instance;
     }
 
-    registerTokenConsumer(tokenConsumer: I_TokenConsumer): void {
-        this.registered.set(tokenConsumer.getId(), tokenConsumer);
-    }
-
-    getTokenConsumer(tokenConsumerId: string): I_TokenConsumer {
-        const Consumer = this.registered.get(tokenConsumerId);
-        if (!Consumer) {
-            throw `NO token consumer registered for id=${tokenConsumerId}`;
-        }
-        return Consumer;
-    }
 
 }
 
@@ -293,15 +240,9 @@ export class MemoryDbTokenAPI implements I_TokenAPI {
         if (token.tokenConsumed) {
             throw new Error(`RM: Token has been consumed by=${token.consumed.by} at=${token.consumed.at}.`);
         }
-        const tokenConsumer = TokenConsumerRegister.getInstance().getTokenConsumer(tokenId);
+        const tokenConsumer = TokenConsumptionRegistrar.getInstance().get(tokenId);
         const consumed = tokenConsumer.consume(decision, token.data);
-        if (consumed) {
-            token.tokenConsumed = true;
-            token.consumed.at = timestamp(),
-            token.consumed.by = executorId(),
-            token.consumed.decision = decision;
-
-        }
+        // trigger other business actions
         return consumed;
     }
 
