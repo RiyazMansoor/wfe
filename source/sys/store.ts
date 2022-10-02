@@ -31,15 +31,12 @@ export type T_Entity = {
  */
 export abstract class AbstractEntity {
 
-    private keyNames: string[];
-
     /**
      * @param entity The data for this entity.
      * @param keyNames The field names the uniquely identify the entity.
      */
-    constructor(entity: T_Entity, keyNames: string[]) {
+    constructor(entity: T_Entity) {
         // empty constructor
-        this.keyNames = keyNames
     }
 
     /**

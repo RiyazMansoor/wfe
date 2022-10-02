@@ -6,8 +6,7 @@
  */
 
 
-import { F_DbFieldCriteria } from "./store";
-import { T_DataType, T_DateRange, T_IndId, T_Integer, T_Timestamp } from "./types";
+import { T_IndId, T_Integer, T_Timestamp } from "./types";
 
 /**
  * Returns a random alphanumeric string of supplied length.

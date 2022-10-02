@@ -1,24 +1,33 @@
+/**
+ * Generic implementation of a class registration system.
+ * Registered classes can be later retrieved via the key used to register them.
+ * 
+ * @author riyaz.mansoor@gmail.com
+ * @created 20221020
+ */
+
 
 import { T_ClassName } from "./types";
 
+
 /**
- * The base interface for the registered item.
+ * The base interface for the class to register.
  * Business methods must be added to extending interfaces.
  */
-export interface I_RegisterItem {
+export interface I_Class {
 
     /**
-     * @returns The unique identifier for this registration.
+     * @returns The unique identifier for this registration - the class name.
      */
     getId(): T_ClassName;
 
 }
 
 /**
- * The abstract base class for registered items.
- * Business methods must be added to extending classes to implment the extended I_RegisterItem.
+ * The abstract base class for registered classes.
+ * Business methods must be added to extending classes.
  */
-export abstract class AbstractRegisterItem implements I_RegisterItem {
+export abstract class AbstractInstance implements I_Class {
 
     getId(): T_ClassName {
         return this.constructor.name;
@@ -28,42 +37,42 @@ export abstract class AbstractRegisterItem implements I_RegisterItem {
 
 
 /**
- * The interface for a (singleton) global register of all I_TokenDecisionExecuter implementations.
- * Whenever a user successfully submits a token, the matching executor is fetched and executed. 
+ * The interface for a (singleton) registry of classes.
  */
-export interface I_Registrar<RI extends I_RegisterItem> {
+export interface I_InstanceRegistrar<I_ExtendedClass extends I_Class> {
 
     /**
-     * @param registerItem The candidate to register.
+     * @param clazz The class to register.
      */
-    register(registerItem: RI): void;
+    register(clazz: I_ExtendedClass): void;
 
     /**
-     * @param registerItemId The class name (unique id) of the registration.
+     * @param clazzId The class name (unique id) of the registration.
      * @throws If matching registration is NOT found.
      * @return The matching registration.
      */
-    get(registerItemId: T_ClassName): RI;
+    get(clazzId: T_ClassName): I_ExtendedClass;
 
 }
 
 /**
- * Singleton registry of token Consumers.
+ * The abstract base class for a generic registry of 'instances'.
+ * Extending concrete class must implement the singleton structure.
  */
-export abstract class AbstractRegistrar<RI extends I_RegisterItem> implements I_Registrar<RI> {
+export abstract class AbstractClassRegistrar<I_ExtendedClass extends I_Class> implements I_InstanceRegistrar<I_ExtendedClass> {
 
-    private registered: Map<T_ClassName, RI> = new Map();
+    private registered: Map<T_ClassName, I_ExtendedClass> = new Map();
 
-    register(registerItem: RI): void {
-        this.registered.set(registerItem.getId(), registerItem);
+    register(clazz: I_ExtendedClass): void {
+        this.registered.set(clazz.getId(), clazz);
     }
 
-    get(registerItemId: T_ClassName): RI {
-        const RI = this.registered.get(registerItemId);
-        if (!RI) {
-            throw `NO registration for id=${registerItemId}`;
+    get(clazz: T_ClassName): I_ExtendedClass {
+        const I_ExtendedClass = this.registered.get(clazz);
+        if (!I_ExtendedClass) {
+            throw `NO registration for id=${clazz}`;
         }
-        return RI;
+        return I_ExtendedClass;
     }
 
 }
