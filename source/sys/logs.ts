@@ -7,7 +7,7 @@
 
 
 import { T_DateRange, T_Timestamp, T_IndId, T_DataObject, T_OrgId, T_ApiName } from "./types";
-import { T_Entity, AbstractEntity, T_EntityType, DbConnections, T_DbTypeCriteria, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./store";
+import { T_Entity, AbstractEntity, T_CollectionId, DbConnections, T_DbTypeCriteria, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./store";
 import { timestamp, executorId, executingForId } from "./util";
 
 
@@ -75,7 +75,7 @@ export interface I_LogAPI {
      * @param entityType The entity type of the log action.
      * @returns All records for the supplied criteria.
      */
-    fetchByEntity(dateRange: T_DateRange, entityType: T_EntityType): T_Entity[];
+    fetchByEntity(dateRange: T_DateRange, entityType: T_CollectionId): T_Entity[];
 
 }
 
@@ -105,7 +105,7 @@ export class LogEntity extends AbstractEntity {
         };
         return log;
     }
-    
+
     protected getEntityDataAsJsonStr(): string {
         return JSON.stringify(this.log);
     }
@@ -159,7 +159,7 @@ export class MemoryDbLogAPI implements I_LogAPI {
             details: details
         };
         const entity: T_Entity = {
-            entityType: LogEntity.constructor.name,
+            collectionId: LogEntity.constructor.name,
             entityData: JSON.parse(JSON.stringify(log))
         }
         DbConnections.getInstance().dbInsert(entity);
@@ -180,7 +180,7 @@ export class MemoryDbLogAPI implements I_LogAPI {
         return this.dbSearch(criteria);
     }
 
-    fetchByEntity(dateRange: T_DateRange, entityType: T_EntityType): T_Entity[] {
+    fetchByEntity(dateRange: T_DateRange, entityType: T_CollectionId): T_Entity[] {
         const criteria: T_DbTypeCriteria = {
             timestamp: dbFieldCriteriaDateRangeIn(dateRange),
             entityType: dbFieldCriteriaEqual(entityType),

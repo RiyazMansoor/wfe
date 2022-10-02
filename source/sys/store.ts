@@ -13,7 +13,9 @@ import { T_DataObject, T_DataType, T_DateRange, T_JsonStr } from "./types";
 /**
  * Unique identifier for data store entity objects.
  */
-export type T_EntityType = string;
+export type T_CollectionId = string;
+
+export type T_ObjectId = string;
 
 /**
  * All data entities will carry its data in this type.
@@ -21,7 +23,8 @@ export type T_EntityType = string;
  * The property @data contains all the business information of the entity.
  */
 export type T_Entity = {
-    entityType: T_EntityType,
+    collectionId: T_CollectionId,
+    objectId: T_ObjectId,
     entityData: T_DataObject
 }
 
@@ -40,10 +43,10 @@ export abstract class AbstractEntity {
     }
 
     /**
-     * @see T_EntityType
+     * @see T_CollectionId
      * @returns The name of the instance class.
      */
-    getEntityType(): T_EntityType {
+    getEntityType(): T_CollectionId {
         return this.constructor.name;
     }
 
@@ -58,7 +61,7 @@ export abstract class AbstractEntity {
      */
     toJSON(): T_Entity {
         return {
-            entityType: this.getEntityType(),
+            collectionId: this.getEntityType(),
             entityData: JSON.parse(this.getEntityDataAsJsonStr())
         };
     }
@@ -84,7 +87,7 @@ export interface I_EntityRegister {
      * @param kind The name of the class type to be registered.
      * @param clazz The class which must have constructor which takes T_Entity
      */
-    registerEntity(kind: T_EntityType, clazz: new (entity: T_Entity) => AbstractEntity): void;
+    registerEntity(kind: T_CollectionId, clazz: new (entity: T_Entity) => AbstractEntity): void;
 
     /**
      * @param entity The entity data  to convert to entity object.
@@ -102,7 +105,7 @@ export class EntityRegister implements I_EntityRegister {
 
     private static registrar: I_EntityRegister;
 
-    private registered: Map<T_EntityType, new (entity: T_Entity) => AbstractEntity> = new Map();
+    private registered: Map<T_CollectionId, new (entity: T_Entity) => AbstractEntity> = new Map();
 
     private constructor() {
         // empty
@@ -118,17 +121,44 @@ export class EntityRegister implements I_EntityRegister {
         return EntityRegister.registrar;
     }
 
-    registerEntity(kind: T_EntityType, clazz: new (entity: T_Entity) => AbstractEntity): void {
+    registerEntity(kind: T_CollectionId, clazz: new (entity: T_Entity) => AbstractEntity): void {
         this.registered.set(kind, clazz);
     }
 
     newEntity(entity: T_Entity): AbstractEntity {
-        const clazz = this.registered.get(entity.entityType);
+        const clazz = this.registered.get(entity.collectionId);
         if (!clazz) {
-            throw `EntityRegister :: Entity Class=${entity.entityType} is NOT Registered!`;
+            throw `EntityRegister :: Entity Class=${entity.collectionId} is NOT Registered!`;
         }
         return new clazz(entity);
     }
+
+}
+
+
+export enum E_WhereCondition {
+    EQ = "==",
+    NEQ = "!=",
+    GT = ">",
+    GTEQ = ">=",
+    LT = "<",
+    LTEQ = "<="
+}
+
+export type T_Where {
+    field: string,
+    condition: E_WhereCondition,
+    value: T_DataType
+}
+
+export function Where(field: string, condition: E_WhereCondition, value: T_DataType): T_Where {
+    const where: T_Where = {
+        field: field,
+        condition: condition,
+        value: value
+    }
+    return where;
+}
 
 }
 
@@ -143,14 +173,14 @@ export interface I_Datastore {
      * @param entityType The type of entity to search.
      * @return Array of matching entity data.
      */
-    dbSearch(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[];
+    dbSearch(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_Entity[];
 
     /**
      * @param criteria The search keys and values.
      * @param entityType The type of entity to search.
      * @return Array of matching entity data that was deleted.
      */
-    dbDelete(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[];
+    dbDelete(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_Entity[];
 
     /**
      * Updates matching data or inserts data.
@@ -207,7 +237,7 @@ export class MemoryDb implements I_Datastore {
 
     private static db: I_Datastore;
 
-    private MEMDB: Map<T_EntityType, Set<T_JsonStr>> = new Map();
+    private MEMDB: Map<T_CollectionId, Set<T_JsonStr>> = new Map();
 
     private constructor() {
 
@@ -238,7 +268,7 @@ export class MemoryDb implements I_Datastore {
      * @throws If matching Set is not found.
      * @returns The matching Set of for @entityType
      */
-    private getSet(entityType: T_EntityType): Set<T_JsonStr> {
+    private getSet(entityType: T_CollectionId): Set<T_JsonStr> {
         const set = this.MEMDB.get(entityType);
         if (!set) {
             throw `MemoryDb :: Kind=${entityType} NOT Found!`;
@@ -261,13 +291,13 @@ export class MemoryDb implements I_Datastore {
         return result;
     }
 
-    dbSearch(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[] {
+    dbSearch(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_Entity[] {
         const set = this.getSet(entityType);
         const matches = this.getMatches(criteria, set);
         return matches.map(jsonStr => JSON.parse(jsonStr));
     }
 
-    dbDelete(criteria: T_DbTypeCriteria, entityType: T_EntityType): T_Entity[] {
+    dbDelete(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_Entity[] {
         const set = this.getSet(entityType);
         const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
@@ -275,7 +305,7 @@ export class MemoryDb implements I_Datastore {
     }
 
     dbUpsert(criteria: T_DbTypeCriteria, data: T_Entity): T_Entity[] {
-        const set = this.getSet(data.entityType);
+        const set = this.getSet(data.collectionId);
         const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
         set.add(JSON.stringify(data));
@@ -283,7 +313,7 @@ export class MemoryDb implements I_Datastore {
     }
 
     dbInsert(data: T_Entity): void {
-        const set = this.getSet(data.entityType);
+        const set = this.getSet(data.collectionId);
         set.add(JSON.stringify(data));
     }
 
