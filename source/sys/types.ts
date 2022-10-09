@@ -40,6 +40,7 @@ export type T_IndId = string;
  */
 export type T_OrgId = string;
 
+export type T_SysId = string;
 
 /**
  * Class names as strings.

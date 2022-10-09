@@ -7,7 +7,42 @@
  * @created 20221020 v0.1
  */
 
-import { T_DataType, T_DateRange, T_JsonStr } from "./types";
+
+
+import { FirebaseApp, initializeApp } from 'firebase/app';
+import { FirestoreDataConverter } from 'firebase/firestore';
+
+// Firebase project configuration - from website
+// NOT to be shared
+const firebaseConfig = {
+    apiKey: "AIzaSyDHL-YYsP7_K4-mJVzxPFYSqyIkDugVPcI",
+    authDomain: "generic-workflows.firebaseapp.com",
+    projectId: "generic-workflows",
+    storageBucket: "generic-workflows.appspot.com",
+    messagingSenderId: "240185085077",
+    appId: "1:240185085077:web:bdb5fbcdae45d73ada5f9c",
+    measurementId: "G-3NNZW16SMT"
+};
+ 
+export class FirebaseConfig {
+
+    private static app: FirebaseApp;
+
+    private constructor() {}
+
+    getApp() {
+        if (!FirebaseConfig.app) {
+            FirebaseConfig.app = initializeApp(firebaseConfig)
+        }
+        return FirebaseConfig.app;
+    }
+
+}
+
+
+
+
+import { T_DataType, T_DateRange, T_IndId, T_SysId, T_JsonStr, T_Timestamp } from "./types";
 
 
 /**
@@ -17,12 +52,11 @@ export type T_CollectionId = string;
 
 export type T_ObjectId = string;
 
-export type T_DataTypes = boolean | number | string | string[];
+export type T_ObjectDataTypes = boolean | number | string | number[] | string[];
 
-export type T_DataStructure = {
-    [index: string]: T_DataTypes | T_DataStructure | T_CollectionId
+export type T_ObjectDataStructure = {
+    [index: string]: T_ObjectDataTypes | T_ObjectDataStructure | T_CollectionId
 }
-
 
 
 /**
@@ -30,13 +64,23 @@ export type T_DataStructure = {
  * The property @kind is used to deserialize into the correcte entity.
  * The property @data contains all the business information of the entity.
  */
-export type T_DataObject = {
+export type T_ObjectData = {
     collectionId: T_CollectionId,
     objectId: T_ObjectId,
-    objectStructure: T_DataStructure | T_DataObject
+    createdAt: T_Timestamp,
+    createdBy: T_IndId | T_SysId,
+    updations?: { updatedBy: T_IndId, updatedAt: T_Timestamp }[],
+    lastUpdatedAt?: T_Timestamp,
+    lastUpdatedBy?: T_IndId,
+    objectDataStructure: T_ObjectDataStructure
 }
 
-type T_ObjectStore = Map<T_ObjectId, T_DataStructure>;
+export interface ObjectConverter<T> extends FirestoreDataConverter<T> {
+
+    
+}
+
+type T_ObjectStore = Map<T_ObjectId, T_ObjectDataStructure>;
 type T_CollectionStore = Map<T_CollectionId, T_ObjectStore>;
 
 
@@ -50,7 +94,7 @@ export abstract class AbstractEntity {
      * @param entity The data for this entity.
      * @param keyNames The field names the uniquely identify the entity.
      */
-    constructor(entity: T_DataObject) {
+    constructor(entity: T_ObjectData) {
         // empty constructor
     }
 
@@ -71,7 +115,7 @@ export abstract class AbstractEntity {
      * Default toJSON() method - to convert entities to plain JSON.
      * @returns A plain JSON object.
      */
-    toJSON(): T_DataObject {
+    toJSON(): T_ObjectData {
         return {
             collectionId: this.getCollectionId(),
             objectData: JSON.parse(this.getEntityDataAsJsonStr())
@@ -101,13 +145,13 @@ export interface I_EntityRegister {
      * @param kind The name of the class type to be registered.
      * @param clazz The class which must have constructor which takes T_Entity
      */
-    registerEntity(kind: T_CollectionId, clazz: new (entity: T_DataObject) => AbstractEntity): void;
+    registerEntity(kind: T_CollectionId, clazz: new (entity: T_ObjectData) => AbstractEntity): void;
 
     /**
      * @param entity The entity data  to convert to entity object.
      * @return The  created matching entity object. 
      */
-    newEntity(entity: T_DataObject): AbstractEntity;
+    newEntity(entity: T_ObjectData): AbstractEntity;
 
 }
 
@@ -119,7 +163,7 @@ export class EntityRegister implements I_EntityRegister {
 
     private static registrar: I_EntityRegister;
 
-    private registered: Map<T_CollectionId, new (entity: T_DataObject) => AbstractEntity> = new Map();
+    private registered: Map<T_CollectionId, new (entity: T_ObjectData) => AbstractEntity> = new Map();
 
     private constructor() {
         // empty
@@ -135,11 +179,11 @@ export class EntityRegister implements I_EntityRegister {
         return EntityRegister.registrar;
     }
 
-    registerEntity(kind: T_CollectionId, clazz: new (entity: T_DataObject) => AbstractEntity): void {
+    registerEntity(kind: T_CollectionId, clazz: new (entity: T_ObjectData) => AbstractEntity): void {
         this.registered.set(kind, clazz);
     }
 
-    newEntity(entity: T_DataObject): AbstractEntity {
+    newEntity(entity: T_ObjectData): AbstractEntity {
         const clazz = this.registered.get(entity.collectionId);
         if (!clazz) {
             throw `EntityRegister :: Entity Class=${entity.collectionId} is NOT Registered!`;
@@ -187,14 +231,14 @@ export interface I_Datastore {
      * @param entityType The type of entity to search.
      * @return Array of matching entity data.
      */
-    dbSearch(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_DataObject[];
+    dbSearch(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_ObjectData[];
 
     /**
      * @param criteria The search keys and values.
      * @param entityType The type of entity to search.
      * @return Array of matching entity data that was deleted.
      */
-    dbDelete(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_DataObject[];
+    dbDelete(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_ObjectData[];
 
     /**
      * Updates matching data or inserts data.
@@ -202,13 +246,13 @@ export interface I_Datastore {
      * @param data The entity data to update or insert.
      * @return The deleted entities.
      */
-    dbUpsert(criteria: T_DbTypeCriteria, data: T_DataObject): T_DataObject[];
+    dbUpsert(criteria: T_DbTypeCriteria, data: T_ObjectData): T_ObjectData[];
 
     /**
      * Just inserts data.
      * @param data The entity data to update or insert.
      */
-    dbInsert(data: T_DataObject): void;
+    dbInsert(data: T_ObjectData): void;
 
 }
 
@@ -305,20 +349,20 @@ export class MemoryDb implements I_Datastore {
         return result;
     }
 
-    dbSearch(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_DataObject[] {
+    dbSearch(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_ObjectData[] {
         const set = this.getSet(entityType);
         const matches = this.getMatches(criteria, set);
         return matches.map(jsonStr => JSON.parse(jsonStr));
     }
 
-    dbDelete(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_DataObject[] {
+    dbDelete(criteria: T_DbTypeCriteria, entityType: T_CollectionId): T_ObjectData[] {
         const set = this.getSet(entityType);
         const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
         return matches.map(jsonStr => JSON.parse(jsonStr));
     }
 
-    dbUpsert(criteria: T_DbTypeCriteria, data: T_DataObject): T_DataObject[] {
+    dbUpsert(criteria: T_DbTypeCriteria, data: T_ObjectData): T_ObjectData[] {
         const set = this.getSet(data.collectionId);
         const matches = this.getMatches(criteria, set);
         matches.forEach(jsonStr => set.delete(jsonStr));
@@ -326,7 +370,7 @@ export class MemoryDb implements I_Datastore {
         return matches;
     }
 
-    dbInsert(data: T_DataObject): void {
+    dbInsert(data: T_ObjectData): void {
         const set = this.getSet(data.collectionId);
         set.add(JSON.stringify(data));
     }

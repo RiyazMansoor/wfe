@@ -9,6 +9,7 @@
 import { T_DateRange, T_Timestamp, T_IndId, T_DataObject, T_OrgId, T_ApiName } from "./types";
 import { T_Entity, AbstractEntity, T_CollectionId, DbConnections, T_DbTypeCriteria, dbFieldCriteriaDateRangeIn, dbFieldCriteriaEqual } from "./store";
 import { timestamp, executorId, executingForId } from "./util";
+import { WithFieldValue, DocumentData, QueryDocumentSnapshot, SnapshotOptions, FirestoreDataConverter, PartialWithFieldValue, SetOptions, Timestamp } from "firebase/firestore";
 
 
 /**
@@ -40,7 +41,37 @@ type T_Log = {
     details: string
 }
 
-import * as fb from "firebase/firestore";
+class LogConverter implements FirestoreDataConverter<T_Log> {
+
+    
+    toFirestore(modelObject: WithFieldValue<T_Log>): DocumentData {
+        const docdata: DocumentData = {
+            timestamp: Timestamp.fromMillis(0), //modelObject.timestamp),
+            executor: modelObject.executor,
+            executingFor: modelObject.executingFor,
+            api: modelObject.api,
+            parameters: modelObject.parameters,
+            result: E_LogResult[modelObject.result],
+            details: modelObject.details
+        };
+    }
+    
+    fromFirestore(snapshot: QueryDocumentSnapshot<DocumentData>, options?: SnapshotOptions | undefined): T_Log {
+        const data = snapshot.data(options)!;
+        const log: T_Log = {
+            timestamp: data.timestamp,
+            executor: data.executor,
+            executingFor: data.executingFor,
+            api: data.api,
+            parameters: data.parameters,
+            result: E_LogResult[data.result],
+            details: data.details
+        }
+        return log;
+    }
+    
+}
+
 
 class Post {
     constructor(readonly title: string, readonly author: string) {}
