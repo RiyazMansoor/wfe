@@ -1,13 +1,4 @@
 
-/**
- * A type for data types used in this project JSON
- */
-type StrNum = string | number ;
- 
-/**
- * Type for representing a data record - parameter name -> parameter value.
- */ 
-type DataMap = Map<string, StrNum> ;
 
 /**
  * Guard function signature - to create this node 
