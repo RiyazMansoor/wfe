@@ -8,13 +8,36 @@
 import { KeyNotFound } from "./errors";
 import { DataMap, StrNum } from "./types";
 
+
+export type DValue = string | number ;
+
+
 /**
- * Guard function names supported in this project
+ * Supported functions to check logical results on data
  */
-export enum GUARDS  { LT, LTE, GT, GTE } ;
+export enum GOps { LT, LTE, GT, GTE } ;
+
+/**
+ * Parameter may refer to a key in the data dictionary or a literal value.
+ */
+export type GParam = { type: "KEY" | "VALUE", param: string } ;
+
+/**
+ * Guard contains a operator function and the parameters that go into it.
+ */
+export type Guard = { guard: GOps, gparam: GParam[] } ;
+
+export interface Guards { type: "OR" | "AND", guards: Guard[] }
 
 
-export function ExecGuard(guard: GUARDS, keys: StrNum[], dataMap: DataMap  ) : boolean {
+/**
+ * Executes a single guard and returns the result.
+ * 
+ * @param guard the check condition to be applied
+ * @param dataMap data dictionary upon which the guard is applied
+ * @returns true if the guard condition passed
+ */
+function ExecGuard(guard: Guard, dataMap: DataMap) : boolean {
     const errs: KeyNotFound[] = [];
     const vals: StrNum[] = [];
     for (const key of keys) {
@@ -28,7 +51,11 @@ export function ExecGuard(guard: GUARDS, keys: StrNum[], dataMap: DataMap  ) : b
     }
     if (errs.length > 0) throw errs;
     switch (guard) {
-        case GUARDS.LT: 
+        case GOps.LT: 
+            const HasNull = vals.some((val) => val == null);
+            if (HasNull) return false;
+            const HasStrs = vals.filter((val) => typeof val === "string");
+            if (HasNull) return false;
             if (vals[0] == null || vals[1] == null) return false; 
             return vals[0] < vals[1];
         default:
@@ -37,4 +64,16 @@ export function ExecGuard(guard: GUARDS, keys: StrNum[], dataMap: DataMap  ) : b
 }
 
 
+function execAndGuards( guards: Guard[], dataMap: DataMap ) : boolean {
+    return guards.every( ( g ) => ExecGuard( g, dataMap ) ) ;
+}
 
+function execOrGuards( guards: Guard[], dataMap: DataMap ) : boolean {
+    return guards.some( ( g ) => ExecGuard( g, dataMap ) ) ;
+}
+
+export function execGuards( guard: Guard | Guards, dataMap: DataMap ) : boolean {
+    if ( guard instanceof Guards ) {
+
+    }
+}
