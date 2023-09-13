@@ -5,6 +5,37 @@
  * @created 20230901
  */
 
+
+// X -> G | GO | GA
+
+type F = () => boolean;
+type F_OR = F[];
+type F_AND = F[];
+type ConOR = (F|F_AND)[];
+type ConAND = (F|F_OR)[];
+type LogicOrAnd = F|ConOR|ConAND;
+
+
+type GuardTree = {
+    guard: Guard,
+    orGuards: GuardTree,
+    andGuards: GuardTree
+}
+
+class CustomType<T> {
+
+    readonly type: string;
+    readonly objects: T[];
+
+    constructor(type: string, objects: T[]) {
+        this.type = type;
+        this.objects = objects;
+    }
+
+
+}
+
+
 import { KeyNotFound } from "./errors";
 import { DataMap, StrNum } from "./types";
 
