@@ -1,12 +1,40 @@
 
+import { ProjectError } from "./errors";
 import { randomId } from "./util";
 
 
-type Datum = string | number ;
-type DataRecord = { [key: string]: Datum } ;
+/**
+ * All data within a workflow is either a string or a number
+ */
+export type Datum = string | number | BusinessData ;
 
-type WorkflowId = string;
-type TaskId = string;
+/**
+ * The representation of all business data contained within any workflow.
+ */
+export type BusinessData = { 
+    [key: string]: Datum 
+}
+
+/**
+ * Every workflow will have a unique instance id.
+ */
+type WorkflowInstanceId = string;
+
+/**
+ * Every task will have a unique task id.
+ */
+type TaskInstanceId = string;
+
+/**
+ * Task class id within a workflow.
+ * Used to instantiate the respective Task.
+ */
+type TaskClassId = string;
+
+/**
+ * Work flow traversal edge froma task to any number of tasks.
+ */
+type TaskClassEdge = [TaskClassId, TaskClassId[]];
 
 
 /**
@@ -16,18 +44,14 @@ type TaskId = string;
 export interface IWorkflow {
 
     /**
-     * Returns the unique id of this workflow.
-     * 
-     * @return the unique id of this workflow
+     * @see WorkflowInstanceId
      */
-    getWorkflowId(): WorkflowId;
+    getWorkflowInstanceId(): WorkflowInstanceId;
 
     /**
-     * Returns the business data contained in this workflow.
-     * 
-     * @return  the business data contained in this workflow
+     * @see BusinessData
      */
-    getDataRecord(): DataRecord;
+    getBusinessData(): BusinessData;
 
 }
 
@@ -37,9 +61,20 @@ export interface IWorkflow {
  */
 export interface ITask {
 
-    getWorkflowId(): WorkflowId;
+    /**
+     * @see TaskClassId
+     */
+    getTaskClassId(): TaskClassId;
+
+    /**
+     * @see WorkflowInstanceId
+     */
+    getWorkflowInstanceId(): WorkflowInstanceId;
     
-    getTaskId(): TaskId;
+    /**
+     * @see TaskInstanceId
+     */
+    getTaskInstanceId(): TaskInstanceId;
 
 }
 
@@ -48,12 +83,12 @@ export abstract class Workflow implements IWorkflow {
     /**
      * Business data record for this workflow.
      */
-    protected dataRecord: DataRecord;
+    protected dataRecord: BusinessData;
 
     /**
      * Unique work flow id.
      */
-    protected workflowId: WorkflowId;
+    protected workflowId: WorkflowInstanceId;
 
 
 
@@ -62,16 +97,16 @@ export abstract class Workflow implements IWorkflow {
      * 
      * @param dataNew initial data to start this workflow 
      */
-    constructor(dataWorkflowStart: DataRecord) {
-        this.validateDataWorkflowStart(dataWorkflowStart);
+    constructor(startData: BusinessData, edges: TaskClassEdge[]) {
+        this.preConstruct(startData);
         this.workflowId = randomId(32);
     }
 
-    getWorkflowId(): WorkflowId {
+    getWorkflowInstanceId(): WorkflowInstanceId {
         return this.workflowId;
     }
 
-    getDataRecord(): DataRecord {
+    getBusinessData(): BusinessData {
         return this.dataRecord;
     }
 
@@ -82,12 +117,66 @@ export abstract class Workflow implements IWorkflow {
      * @param dataNew initial data to start this workflow
      * @throws exception matching failed requirements
      */
-    protected abstract validateDataWorkflowStart(dataNew: DataRecord);
+    protected abstract preConstruct(dataNew: BusinessData);
 
     /**
      * Creates and returns the next tasks in this workflow.
      */
     protected abstract createTasks(): ITask;
+
+
+}
+
+export abstract class Task implements ITask {
+
+    protected workflowInstanceId: WorkflowInstanceId;
+    protected taskInstanceId: TaskInstanceId;
+    protected taskClassId: TaskClassId;
+
+    constructor(workflowData: BusinessData, workflowInstanceId: WorkflowInstanceId,
+                taskClassId: TaskClassId) {
+        this.workflowInstanceId = workflowInstanceId;
+        this.taskClassId = taskClassId;
+        this.taskInstanceId = randomId(32);
+    }
+
+    getTaskClassId(): string {
+        return this.taskClassId;
+    }
+
+    getWorkflowInstanceId(): string {
+        return this.workflowInstanceId;
+    }
+
+    getTaskInstanceId(): string {
+        return this.taskInstanceId;
+    }
+
+    protected abstract preConstruct();
+    
+}
+
+export class SendEmail extends Task {
+
+    protected jsonProperties: string[];
+
+    constructor(workflowData: BusinessData, workflowInstanceId: WorkflowInstanceId,
+                jsonProperties: string[]) {
+        super(workflowData, workflowInstanceId, "0");
+        this.jsonProperties = jsonProperties;
+        const errors: ProjectError[] = [];
+        for (const prop of jsonProperties) {
+            try {
+                
+            } catch (err) {
+                errors.push(err);
+            }
+        }
+    }
+
+    protected preConstruct() {
+        throw new Error("Method not implemented.");
+    }
 
 
 }

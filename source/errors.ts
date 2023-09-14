@@ -10,7 +10,7 @@
  * Abstract top level error class for this project.
  * Handles the manual prototype adjustment to the created class. 
  */
-export abstract class ProjectError extends Error {
+export class ProjectError extends Error {
 
     constructor(msg: string) {
         super(msg);
