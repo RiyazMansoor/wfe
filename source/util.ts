@@ -15,7 +15,7 @@ export function randomId( len: number = 24 ) : string {
     return id.substring( 0, len ) ;
 }
 
-export function timeString() : string {
+export function timestampString() : string {
     return new Date().toISOString().replace( /\D/g, "" ) ;
 }
 

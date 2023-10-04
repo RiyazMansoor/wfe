@@ -8,6 +8,27 @@
 
 
 /**
+ * Type for Datetime timestamp - representated as ISO string with timezone.
+ */
+export type Timestamp = string;
+
+/**
+ * Authorization id of system users.
+ */
+export type AuthId = string;
+
+/**
+ * Structure of a audit log entry
+ */
+export type AuditLog = {
+    timestamp: Timestamp,
+    authId: AuthId,
+    logType: string,
+    logText: string
+}
+
+
+/**
  * Type for integers.
  */
 export type T_Integer = number;
@@ -15,12 +36,12 @@ export type T_Integer = number;
 /**
  * Type for Date - representated as ISO string yyyymmdd.
  */
-export type T_Date = string;
+export type T_Email = string;
 
 /**
- * Type for Datetime timestamp - representated as ISO string with timezone.
+ * Type for Date - representated as ISO string yyyymmdd.
  */
-export type T_Timestamp = string;
+export type T_Date = string;
 
 /**
  * HTML text.
@@ -37,15 +58,19 @@ export type T_URL = string;
  */
 export type T_JsonStr = string;
 
-/**
- * A type for data types used in this project JSON
+                                                                                                                                                                                              /**
+ * All data within a workflow is either a string or a number
  */
-export type StrNum = string | number ;
- 
+export type T_Datum = string | number | T_DataObj ;
+
 /**
- * Type for representing a data record - parameter name -> parameter value.
- */ 
-export type DataMap = Map<string, StrNum> ;
+ * The representation of all business data contained within any workflow.
+ */
+export type T_DataObj = { 
+    [key: string]: Datum 
+}
+
+
 
 /**
  * Type for a ate range.
