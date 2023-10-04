@@ -27,6 +27,22 @@ export type AuditLog = {
     logText: string
 }
 
+/**
+ * All data within a workflow is either a string or a number
+ */
+export type Datum = string | number | DataSet ;
+
+/**
+ * The representation of all business data contained within any workflow.
+ */
+export type DataSet = { 
+  [key: string]: Datum 
+}
+
+
+
+
+
 
 /**
  * Type for integers.
